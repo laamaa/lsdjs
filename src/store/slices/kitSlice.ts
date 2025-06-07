@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice, PayloadAction, Middleware, UnknownAction } from '@reduxjs/toolkit';
+import { WritableDraft } from 'immer';
 import { FileService } from '../../services/file/FileService';
 import { Sample, SampleBankCompiler, AudioService } from '../../services/audio';
 import { RootState } from '../store';
@@ -37,6 +38,7 @@ export const updateRomDataWithKit = createAsyncThunk<void, void>(
 // Constants
 const MAX_SAMPLES = 15;
 const MAX_SAMPLE_SPACE = 0x3fa0;
+const BANK_SIZE = 0x4000; // 16,384 bytes
 
 // Define the kit information interface
 export interface KitInfo {
@@ -58,6 +60,19 @@ interface KitState {
   isLoading: boolean;
   error: string | null;
 }
+
+// Helper function to calculate total sample size and bytes free
+const calculateSampleSizeAndBytesFree = (samples: (Sample | WritableDraft<Sample> | null)[]): { totalSampleSizeInBytes: number; bytesFree: number } => {
+  const totalSampleSizeInBytes = samples.reduce(
+    (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
+    0
+  );
+
+  return {
+    totalSampleSizeInBytes,
+    bytesFree: MAX_SAMPLE_SPACE - totalSampleSizeInBytes
+  };
+};
 
 // Define the initial state
 const initialState: KitState = {
@@ -86,12 +101,7 @@ export const loadKitFromRomBank = createAsyncThunk<LoadKitFromRomBankResult, { r
       const { samples, kitName } = SampleBankCompiler.extractFromRomBank(romData, bankIndex);
 
       // Calculate total sample size and bytes free
-      const totalSampleSizeInBytes = samples.reduce(
-        (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-        0
-      );
-
-      const bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+      const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(samples);
 
       return {
         kitInfo: {
@@ -109,7 +119,7 @@ export const loadKitFromRomBank = createAsyncThunk<LoadKitFromRomBankResult, { r
   }
 );
 
-// Define return type for loadKitFromFile thunk
+// Define the return type for loadKitFromFile thunk
 interface LoadKitResult {
   kitInfo?: KitInfo;
   samples?: (Sample | null)[];
@@ -149,7 +159,6 @@ export const loadKitFromFile = createAsyncThunk<LoadKitResult, void>(
 
       // Write the kit data to the ROM
       const bankIndex = state.kit.selectedBankIndex;
-      const BANK_SIZE = 0x4000; // 16,384 bytes
       const bankOffset = bankIndex * BANK_SIZE;
 
       // Copy the kit data to the ROM
@@ -159,12 +168,7 @@ export const loadKitFromFile = createAsyncThunk<LoadKitResult, void>(
       const { samples, kitName } = SampleBankCompiler.extractFromRomBank(newRomData, bankIndex);
 
       // Calculate total sample size and bytes free
-      const totalSampleSizeInBytes = samples.reduce(
-        (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-        0
-      );
-
-      const bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+      const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(samples);
 
       return {
         kitInfo: {
@@ -183,7 +187,7 @@ export const loadKitFromFile = createAsyncThunk<LoadKitResult, void>(
   }
 );
 
-// Define return type for saveKitToFile thunk
+// Define the return type for saveKitToFile thunk
 interface SaveKitResult {
   success?: boolean;
   canceled?: boolean;
@@ -203,7 +207,6 @@ export const saveKitToFile = createAsyncThunk<SaveKitResult, void>(
       }
 
       // Create a buffer for the kit data
-      const BANK_SIZE = 0x4000; // 16,384 bytes
       const kitData = new Uint8Array(BANK_SIZE);
 
       // Copy the bank data from the ROM
@@ -260,7 +263,7 @@ export const addSample = createAsyncThunk<AddSampleResult, void>(
       }
 
       // Create a File object from the ArrayBuffer
-      const fileName = 'sample.wav'; // Default name, will be replaced by the actual file name
+      const fileName = 'sample.wav'; // The default name will be replaced by the actual file name
       const file = new File([fileData], fileName, { type: 'audio/wav' });
 
       // Create a sample from the WAV file
@@ -276,13 +279,8 @@ export const addSample = createAsyncThunk<AddSampleResult, void>(
       const newSamples = [...samples];
       newSamples[firstFreeSlot] = sample;
 
-      // Calculate total sample size and bytes free
-      const totalSampleSizeInBytes = newSamples.reduce(
-        (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-        0
-      );
-
-      const bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+      // Calculate bytes free
+      const { bytesFree } = calculateSampleSizeAndBytesFree(newSamples);
 
       // If the sample doesn't fit, trim it
       if (bytesFree < 0) {
@@ -374,14 +372,10 @@ const kitSlice = createSlice({
         sample.processSamples();
 
         // Update total sample size and bytes free
-        const totalSampleSizeInBytes = state.samples.reduce(
-          (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-          0
-        );
-
         if (state.kitInfo) {
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
           state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
-          state.kitInfo.bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
       }
     },
@@ -391,24 +385,6 @@ const kitSlice = createSlice({
       if (sample) {
         // Store the pitch value in the sample
         sample.setPitchSemitones(pitchSemitones);
-        // Note: pitch changes require reloading the sample, which is async
-        // This will be handled in the component
-
-        // For ROM samples, we need to ensure the pitch value is preserved
-        // even after the sample is processed or reloaded
-        if (!sample.getFile()) {
-          // This is a ROM sample, so we need to make sure the pitch value sticks
-          // even after applyPitchShift resets it to 0
-
-          // Get a reference to the sample object outside of the timeout
-          const sampleRef = sample;
-          const pitchValue = pitchSemitones;
-
-          setTimeout(() => {
-            // Use the captured sample reference instead of accessing state
-            sampleRef.setPitchSemitones(pitchValue);
-          }, 10);
-        }
       }
     },
     updateSampleTrim: (state, action: PayloadAction<{ sampleIndex: number; trim: number }>) => {
@@ -419,14 +395,10 @@ const kitSlice = createSlice({
         sample.processSamples();
 
         // Update total sample size and bytes free
-        const totalSampleSizeInBytes = state.samples.reduce(
-          (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-          0
-        );
-
         if (state.kitInfo) {
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
           state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
-          state.kitInfo.bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
       }
     },
@@ -447,58 +419,62 @@ const kitSlice = createSlice({
     },
     deleteFrames: (state, action: PayloadAction<{ sampleIndex: number; startFrame: number; endFrame: number }>) => {
       const { sampleIndex, startFrame, endFrame } = action.payload;
-      // Add console logs to track the execution flow
-      console.log('kitSlice.deleteFrames called with:', sampleIndex, startFrame, endFrame);
-
       const sample = state.samples[sampleIndex];
+
       if (sample) {
-        console.log('Sample found, calling sample.deleteFrames');
         const success = sample.deleteFrames(startFrame, endFrame);
-        console.log('sample.deleteFrames returned:', success);
 
-        if (success) {
-          console.log('Updating total sample size and bytes free');
+        if (success && state.kitInfo) {
           // Update total sample size and bytes free
-          const totalSampleSizeInBytes = state.samples.reduce(
-            (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-            0
-          );
-
-          if (state.kitInfo) {
-            state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
-            state.kitInfo.bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
-          }
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
+          state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
-      } else {
-        console.log('Sample not found');
       }
     },
     cropFrames: (state, action: PayloadAction<{ sampleIndex: number; startFrame: number; endFrame: number }>) => {
       const { sampleIndex, startFrame, endFrame } = action.payload;
-      // Add console logs to track the execution flow
-      console.log('kitSlice.cropFrames called with:', sampleIndex, startFrame, endFrame);
-
       const sample = state.samples[sampleIndex];
+
       if (sample) {
-        console.log('Sample found, calling sample.cropFrames');
         const success = sample.cropFrames(startFrame, endFrame);
-        console.log('sample.cropFrames returned:', success);
 
-        if (success) {
-          console.log('Updating total sample size and bytes free');
+        if (success && state.kitInfo) {
           // Update total sample size and bytes free
-          const totalSampleSizeInBytes = state.samples.reduce(
-            (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-            0
-          );
-
-          if (state.kitInfo) {
-            state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
-            state.kitInfo.bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
-          }
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
+          state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
-      } else {
-        console.log('Sample not found');
+      }
+    },
+    fadeInFrames: (state, action: PayloadAction<{ sampleIndex: number; startFrame: number; endFrame: number }>) => {
+      const { sampleIndex, startFrame, endFrame } = action.payload;
+      const sample = state.samples[sampleIndex];
+
+      if (sample) {
+        const success = sample.fadeInFrames(startFrame, endFrame);
+
+        if (success && state.kitInfo) {
+          // Update total sample size and bytes free
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
+          state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
+        }
+      }
+    },
+    fadeOutFrames: (state, action: PayloadAction<{ sampleIndex: number; startFrame: number; endFrame: number }>) => {
+      const { sampleIndex, startFrame, endFrame } = action.payload;
+      const sample = state.samples[sampleIndex];
+
+      if (sample) {
+        const success = sample.fadeOutFrames(startFrame, endFrame);
+
+        if (success && state.kitInfo) {
+          // Update total sample size and bytes free
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
+          state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
+        }
       }
     },
     clearKit: (state) => {
@@ -527,21 +503,45 @@ const kitSlice = createSlice({
         state.samples = newSamples;
 
         // Update total sample size and bytes free
-        const totalSampleSizeInBytes = newSamples.reduce(
-          (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-          0
-        );
-
         if (state.kitInfo) {
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(newSamples);
           state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
-          state.kitInfo.bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
 
-        // Update selected sample index if needed
+        // Update the selected sample index if needed
         if (state.selectedSampleIndex === sampleIndex) {
           state.selectedSampleIndex = null;
         } else if (state.selectedSampleIndex !== null && state.selectedSampleIndex > sampleIndex) {
           state.selectedSampleIndex--;
+        }
+      }
+    },
+    revertSample: (state, action: PayloadAction<number>) => {
+      const sampleIndex = action.payload;
+      const sample = state.samples[sampleIndex];
+
+      if (sample) {
+        // Reset all editable properties to default values
+        sample.setVolumeDb(0);
+        sample.setPitchSemitones(0);
+        sample.setTrim(0);
+        sample.setDither(false);
+
+        // If the sample has a file, reload it with default settings
+        if (sample.getFile()) {
+          // The actual reload will happen in the component after this action
+        } else if (sample.getUneditedSamples()) {
+          // For samples without a file, reset to the unedited samples
+          sample.setOriginalSamplesFromUnedited();
+          sample.processSamples();
+        }
+
+        // Update total sample size and bytes free
+        if (state.kitInfo) {
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(state.samples);
+          state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
       }
     },
@@ -569,9 +569,9 @@ const kitSlice = createSlice({
         state.error = null;
       })
       .addCase(loadKitFromFile.fulfilled, (state, action) => {
-        // Check if the action was canceled by the user
+        // Check if the user canceled the action
         if (action.payload.canceled) {
-          // User canceled the file selection, just reset loading state without error
+          // User canceled the file selection, just reset the loading state without error
           state.isLoading = false;
           return;
         }
@@ -592,9 +592,9 @@ const kitSlice = createSlice({
         state.error = null;
       })
       .addCase(saveKitToFile.fulfilled, (state, action) => {
-        // Check if the action was canceled by the user
+        // Check if the user canceled the action
         if (action.payload.canceled) {
-          // User canceled the save operation, just reset loading state without error
+          // User canceled the save operation, just reset the loading state without error
           state.isLoading = false;
           return;
         }
@@ -611,9 +611,9 @@ const kitSlice = createSlice({
         state.error = null;
       })
       .addCase(addSample.fulfilled, (state, action) => {
-        // Check if the action was canceled by the user
+        // Check if the user canceled the action
         if (action.payload.canceled) {
-          // User canceled the file selection, just reset loading state without error
+          // User canceled the file selection, just reset the loading state without error
           state.isLoading = false;
           return;
         }
@@ -624,14 +624,10 @@ const kitSlice = createSlice({
         state.selectedSampleIndex = action.payload.selectedSampleIndex !== undefined ? action.payload.selectedSampleIndex : null;
 
         // Update total sample size and bytes free
-        const totalSampleSizeInBytes = (action.payload.samples || []).reduce(
-          (total, sample) => total + (sample ? sample.lengthInBytes() : 0),
-          0
-        );
-
-        if (state.kitInfo) {
+        if (state.kitInfo && action.payload.samples) {
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(action.payload.samples);
           state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
-          state.kitInfo.bytesFree = MAX_SAMPLE_SPACE - totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
         }
       })
       .addCase(addSample.rejected, (state, action) => {
@@ -667,6 +663,9 @@ export const {
   removeSample,
   deleteFrames,
   cropFrames,
+  fadeInFrames,
+  fadeOutFrames,
+  revertSample,
 } = kitSlice.actions;
 
 // Define a type for the window object with our custom property
@@ -674,12 +673,8 @@ interface CustomWindow extends Window {
   __kitUpdateTimeout: ReturnType<typeof setTimeout> | null;
 }
 
-// Create a middleware to update ROM data after kit modifications
-export const kitMiddleware: Middleware = (store) => (next) => (action: unknown) => {
-  // Call the next middleware in the chain
-  const result = next(action);
-
-  // Check if the action is one that modifies kit data
+// Type guard to check if an action is a kit modifying action
+const isKitModifyingAction = (action: unknown): action is { type: string } => {
   const kitModifyingActions = [
     'kit/renameKit',
     'kit/updateSampleVolume',
@@ -691,22 +686,37 @@ export const kitMiddleware: Middleware = (store) => (next) => (action: unknown) 
     'kit/removeSample',
     'kit/deleteFrames',
     'kit/cropFrames',
+    'kit/fadeInFrames',
+    'kit/fadeOutFrames',
+    'kit/revertSample',
     'kit/addSample/fulfilled',
     'kit/loadKitFromFile/fulfilled',
     'kit/loadKitFromRomBank/fulfilled',
   ];
 
-  // Prevent infinite loops by not dispatching for updateRomDataWithKit actions
-  if (
+  const updateRomDataWithKitActions = [
+    'kit/updateRomDataWithKit/pending',
+    'kit/updateRomDataWithKit/fulfilled',
+    'kit/updateRomDataWithKit/rejected'
+  ];
+
+  return (
     typeof action === 'object' && 
     action !== null && 
     'type' in action && 
     typeof action.type === 'string' && 
     kitModifyingActions.includes(action.type) && 
-    action.type !== 'kit/updateRomDataWithKit/pending' && 
-    action.type !== 'kit/updateRomDataWithKit/fulfilled' && 
-    action.type !== 'kit/updateRomDataWithKit/rejected'
-  ) {
+    !updateRomDataWithKitActions.includes(action.type)
+  );
+};
+
+// Create a middleware to update ROM data after kit modifications
+export const kitMiddleware: Middleware = (store) => (next) => (action: unknown) => {
+  // Call the next middleware in the chain
+  const result = next(action);
+
+  // Check if the action is one that modifies kit data
+  if (isKitModifyingAction(action)) {
     // Use a debounced dispatch to prevent multiple rapid updates
     // Clear any existing timeout
     const customWindow = window as unknown as CustomWindow;

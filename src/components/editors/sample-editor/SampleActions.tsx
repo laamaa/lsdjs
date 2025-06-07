@@ -5,16 +5,18 @@ interface SampleActionsProps {
   isLoading: boolean;
   onRemoveSample: (index: number) => void;
   onPlaySample: (index: number) => void;
+  onRevertSample: (index: number) => void;
 }
 
 /**
- * Component for sample actions (remove, play)
+ * Component for sample actions (remove, play, revert)
  */
 export function SampleActions({
   sampleIndex,
   isLoading,
   onRemoveSample,
-  onPlaySample
+  onPlaySample,
+  onRevertSample
 }: SampleActionsProps) {
   return (
     <div className="sample-actions">
@@ -31,6 +33,13 @@ export function SampleActions({
         aria-label="Play sample"
       >
         Play
+      </button>
+      <button
+        onClick={() => onRevertSample(sampleIndex)}
+        disabled={isLoading}
+        aria-label="Undo all edits"
+      >
+        Revert
       </button>
     </div>
   );

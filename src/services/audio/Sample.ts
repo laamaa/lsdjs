@@ -47,7 +47,7 @@ export interface SampleProcessingOptions {
 export class Sample {
   private name: string;
   private originalSamples: Int16Array | null = null;
-  private trulyOriginalSamples: Int16Array | null = null; // Never modified by pitch shifts
+  private uneditedSamples: Int16Array | null = null; // Never modified by pitch shifts
   private processedSamples: Int16Array;
   private _untrimmedLength: number = -1;
   private readPos: number = 0;
@@ -72,7 +72,7 @@ export class Sample {
     if (samples) {
       this.processedSamples = samples;
       // Store a copy of the original samples that will never be modified by pitch shifts
-      this.trulyOriginalSamples = samples.slice();
+      this.uneditedSamples = samples.slice();
     } else {
       this.processedSamples = new Int16Array(0);
     }
@@ -231,6 +231,23 @@ export class Sample {
   }
 
   /**
+   * Gets the unedited samples that will never be modified by pitch shifts
+   */
+  public getUneditedSamples(): Int16Array | null {
+    return this.uneditedSamples;
+  }
+
+  /**
+   * Sets the original samples from the unedited samples
+   *
+   */
+  public setOriginalSamplesFromUnedited(): void {
+    if (this.uneditedSamples) {
+      this.originalSamples = this.uneditedSamples.slice();
+    }
+  }
+
+  /**
    * Processes the samples with the current settings
    */
   public processSamples(): void {
@@ -270,9 +287,9 @@ export class Sample {
     const outFactor = Math.pow(2.0, this.pitchSemitones / 12.0);
     const samples = await this.readSamples(this.file, halfSpeed, outFactor);
 
-    // Store the samples in both originalSamples and trulyOriginalSamples
+    // Store the samples in both originalSamples and uneditedSamples
     this.originalSamples = samples;
-    this.trulyOriginalSamples = samples.slice(); // Keep a copy that will never be modified by pitch shifts
+    this.uneditedSamples = samples.slice(); // Keep a copy that will never be modified by pitch shifts
 
     this.processSamples();
   }
@@ -285,7 +302,7 @@ export class Sample {
    * @returns true if pitch shifting was applied, false otherwise
    */
   public applyPitchShift(halfSpeed: boolean): boolean {
-    if (!this.trulyOriginalSamples) {
+    if (!this.uneditedSamples) {
       return false;
     }
 
@@ -294,9 +311,9 @@ export class Sample {
 
     // If pitch is 0, no need to resample
     if (currentPitch === 0) {
-      // Reset to truly original samples
-      if (this.trulyOriginalSamples) {
-        this.originalSamples = this.trulyOriginalSamples.slice();
+      // Reset to unedited samples
+      if (this.uneditedSamples) {
+        this.originalSamples = this.uneditedSamples.slice();
         this.processSamples();
       }
       return true;
@@ -309,8 +326,8 @@ export class Sample {
     const baseSampleRate = halfSpeed ? 5734 : 11468;
     const outSampleRate = baseSampleRate / outFactor;
 
-    // Always resample from the truly original samples to avoid cumulative pitch shifts
-    this.originalSamples = this.resample(this.trulyOriginalSamples, baseSampleRate, outSampleRate);
+    // Always resample from the unedited samples to avoid cumulative pitch shifts
+    this.originalSamples = this.resample(this.uneditedSamples, baseSampleRate, outSampleRate);
 
     // Process the samples with the updated data
     this.processSamples();
@@ -349,8 +366,8 @@ export class Sample {
     const sample = new Sample(buf, name);
     // Store the original samples to enable editing operations like deleteFrames
     sample.originalSamples = buf.slice();
-    // Also store a copy in trulyOriginalSamples that will never be modified by pitch shifts
-    sample.trulyOriginalSamples = buf.slice();
+    // Also store a copy in uneditedSamples that will never be modified by pitch shifts
+    sample.uneditedSamples = buf.slice();
     return sample;
   }
 
@@ -390,7 +407,7 @@ export class Sample {
     const newSample = new Sample(null, sample.name);
     newSample.file = sample.file;
     newSample.originalSamples = sample.originalSamples ? sample.originalSamples.slice() : null;
-    newSample.trulyOriginalSamples = sample.trulyOriginalSamples ? sample.trulyOriginalSamples.slice() : null;
+    newSample.uneditedSamples = sample.uneditedSamples ? sample.uneditedSamples.slice() : null;
     newSample.processedSamples = sample.processedSamples.slice();
     newSample._untrimmedLength = sample._untrimmedLength;
     newSample.readPos = sample.readPos;
@@ -624,7 +641,7 @@ export class Sample {
     console.log('Sample.deleteFrames called with:', startFrame, endFrame);
     console.log('originalSamples length:', this.originalSamples?.length);
 
-    if (!this.originalSamples || !this.trulyOriginalSamples) {
+    if (!this.originalSamples || !this.uneditedSamples) {
       console.log('No original samples, returning false');
       return false; // Can't delete frames if we don't have original samples
     }
@@ -652,9 +669,9 @@ export class Sample {
       newSamples[j] = this.originalSamples[i];
     }
 
-    // Update both the original samples and the truly original samples
+    // Update both the original samples and the unedited samples
     this.originalSamples = newSamples;
-    this.trulyOriginalSamples = newSamples.slice(); // Update truly original samples too
+    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
 
     // Process the samples with the updated data
     this.processSamples();
@@ -674,7 +691,7 @@ export class Sample {
     console.log('Sample.cropFrames called with:', startFrame, endFrame);
     console.log('originalSamples length:', this.originalSamples?.length);
 
-    if (!this.originalSamples || !this.trulyOriginalSamples) {
+    if (!this.originalSamples || !this.uneditedSamples) {
       console.log('No original samples, returning false');
       return false; // Can't crop frames if we don't have original samples
     }
@@ -697,9 +714,115 @@ export class Sample {
       newSamples[j] = this.originalSamples[i];
     }
 
-    // Update both the original samples and the truly original samples
+    // Update both the original samples and the unedited samples
     this.originalSamples = newSamples;
-    this.trulyOriginalSamples = newSamples.slice(); // Update truly original samples too
+    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
+
+    // Process the samples with the updated data
+    this.processSamples();
+
+    return true;
+  }
+
+  /**
+   * Applies a fade-in effect to the selected frames
+   * 
+   * @param startFrame - The starting frame index
+   * @param endFrame - The ending frame index
+   * @returns true if the fade-in was applied, false otherwise
+   */
+  public fadeInFrames(startFrame: number, endFrame: number): boolean {
+    console.log('Sample.fadeInFrames called with:', startFrame, endFrame);
+    console.log('originalSamples length:', this.originalSamples?.length);
+
+    if (!this.originalSamples || !this.uneditedSamples) {
+      console.log('No original samples, returning false');
+      return false; // Can't apply fade-in if we don't have original samples
+    }
+
+    // Ensure start is less than end
+    const start = Math.min(startFrame, endFrame);
+    const end = Math.max(startFrame, endFrame);
+
+    // Validate frame indices
+    if (start < 0 || end >= this.originalSamples.length) {
+      console.log('Frame indices out of bounds, returning false');
+      return false;
+    }
+
+    // Create a new array with the same length as the original
+    const newSamples = new Int16Array(this.originalSamples.length);
+
+    // Copy all samples
+    for (let i = 0; i < this.originalSamples.length; i++) {
+      newSamples[i] = this.originalSamples[i];
+    }
+
+    // Apply fade-in to the selected range
+    const rangeLength = end - start + 1;
+    for (let i = start; i <= end; i++) {
+      // Calculate fade factor (0 to 1) based on position in the range
+      const fadeFactor = (i - start) / rangeLength;
+      // Apply the fade factor to the sample
+      newSamples[i] = Math.round(this.originalSamples[i] * fadeFactor);
+    }
+
+    // Update both the original samples and the unedited samples
+    this.originalSamples = newSamples;
+    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
+
+    // Process the samples with the updated data
+    this.processSamples();
+
+    return true;
+  }
+
+  /**
+   * Applies a fade-out effect to the selected frames
+   * 
+   * @param startFrame - The starting frame index
+   * @param endFrame - The ending frame index
+   * @returns true if the fade-out was applied, false otherwise
+   */
+  public fadeOutFrames(startFrame: number, endFrame: number): boolean {
+    console.log('Sample.fadeOutFrames called with:', startFrame, endFrame);
+    console.log('originalSamples length:', this.originalSamples?.length);
+
+    if (!this.originalSamples || !this.uneditedSamples) {
+      console.log('No original samples, returning false');
+      return false; // Can't apply fade-out if we don't have original samples
+    }
+
+    // Ensure start is less than end
+    const start = Math.min(startFrame, endFrame);
+    const end = Math.max(startFrame, endFrame);
+
+    // Validate frame indices
+    if (start < 0 || end >= this.originalSamples.length) {
+      console.log('Frame indices out of bounds, returning false');
+      return false;
+    }
+
+    // Create a new array with the same length as the original
+    const newSamples = new Int16Array(this.originalSamples.length);
+
+    // Copy all samples
+    for (let i = 0; i < this.originalSamples.length; i++) {
+      newSamples[i] = this.originalSamples[i];
+    }
+
+    // Apply fade-out to the selected range
+    const rangeLength = end - start + 1;
+    for (let i = start; i <= end; i++) {
+      // Calculate fade factor (1 to 0) based on position in the range
+      const fadeFactor = 1 - ((i - start) / rangeLength);
+      // Apply the fade factor to the sample
+      newSamples[i] = Math.round(this.originalSamples[i] * fadeFactor);
+    }
+
+    // Update both the original samples and the unedited samples
+    this.originalSamples = newSamples;
+    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
 
     // Process the samples with the updated data
     this.processSamples();

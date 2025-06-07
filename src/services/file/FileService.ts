@@ -225,7 +225,7 @@ export const FileService = {
 
         // Handle window focus (file dialog closed)
         const handleFocus = () => {
-          // Only process if the file picker was opened and we haven't already processed the close
+          // Only process if the file picker was opened and we haven't yet processed the close
           if (filePickerOpened && !fileDialogClosed) {
             fileDialogClosed = true;
 
@@ -234,7 +234,7 @@ export const FileService = {
                                   /WebKit/.test(navigator.userAgent) && 
                                   !/(CriOS|FxiOS|OPiOS|mercury)/.test(navigator.userAgent);
 
-            // On mobile Safari, don't automatically assume dialog was closed without selection
+            // On mobile Safari, don't automatically assume a dialog was closed without selection
             // as focus/blur events behave differently on iOS
             if (isMobileSafari) {
               // For mobile Safari, we'll rely solely on the change event
@@ -351,7 +351,7 @@ export const FileService = {
               cleanup();
               resolve(null);
             }
-          }, 60000); // 1 minute timeout
+          }, 60000); // 1-minute timeout
         }
 
         // Use setTimeout to ensure the input is in the DOM before clicking
@@ -487,13 +487,19 @@ export const FileService = {
           // Revoke the URL after a delay
           setTimeout(() => {
             URL.revokeObjectURL(url);
-          }, 60000); // Keep URL valid for 1 minute to give user time to save
+          }, 60000); // Keep URL valid for 1 minute to give the user time to save
 
           return { success: true };
         } catch (error) {
           console.error('Error opening file in new tab:', error);
           URL.revokeObjectURL(url);
-          throw error;
+          return {
+            success: false,
+            error: {
+              code: 'IO_ERROR',
+              message: error instanceof Error ? error.message : 'Unknown error occurred'
+            }
+          };
         }
       }
 

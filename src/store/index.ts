@@ -40,6 +40,9 @@ export {
   removeSample,
   deleteFrames,
   cropFrames,
+  fadeInFrames,
+  fadeOutFrames,
+  revertSample,
 } from './slices/kitSlice';
 
 // Export interfaces from slices

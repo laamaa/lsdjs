@@ -10,7 +10,10 @@ import {
   removeSample,
   deleteFrames,
   cropFrames,
-  selectSample
+  fadeInFrames,
+  fadeOutFrames,
+  selectSample,
+  revertSample
 } from '../../store';
 import { SampleWaveform } from './SampleWaveform';
 import { Sample } from '../../services/audio';
@@ -203,6 +206,20 @@ export function SampleEditor({
     }
   }, [dispatch]);
 
+  // Handler for reverting a sample to its original state
+  const handleRevertSample = useCallback(async (index: number) => {
+    if (window.confirm(`Are you sure you want to revert all edits for sample ${index}?`)) {
+      dispatch(revertSample(index));
+
+      // If the sample has a file, we need to reload it
+      const sample = samples[index];
+      if (sample && sample.getFile()) {
+        await sample.reload(isHalfSpeed);
+        dispatch(selectSample(index));
+      }
+    }
+  }, [dispatch, samples, isHalfSpeed]);
+
   const handleDeleteFrames = useCallback(async () => {
     if (selectedSampleIndex !== null && selection) {
       if (window.confirm(`Are you sure you want to delete frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
@@ -265,6 +282,68 @@ export function SampleEditor({
     }
   }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
 
+  const handleFadeInFrames = useCallback(async () => {
+    if (selectedSampleIndex !== null && selection) {
+      if (window.confirm(`Are you sure you want to apply fade in to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
+        const sample = samples[selectedSampleIndex];
+        if (sample) {
+          const originalSamples = sample.workSampleData();
+
+          const startFrame = Math.min(selection.startFrame, originalSamples.length - 1);
+          const endFrame = Math.min(selection.endFrame, originalSamples.length - 1);
+
+          const minFrame = Math.min(startFrame, endFrame);
+          const maxFrame = Math.max(startFrame, endFrame);
+
+          dispatch(fadeInFrames({
+            sampleIndex: selectedSampleIndex,
+            startFrame: minFrame,
+            endFrame: maxFrame
+          }));
+
+          const updatedSample = samples[selectedSampleIndex];
+          if (updatedSample && updatedSample.getFile()) {
+            await updatedSample.reload(isHalfSpeed);
+            dispatch(selectSample(selectedSampleIndex));
+          }
+
+          setSelection(null); // Clear selection after applying fade in
+        }
+      }
+    }
+  }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
+
+  const handleFadeOutFrames = useCallback(async () => {
+    if (selectedSampleIndex !== null && selection) {
+      if (window.confirm(`Are you sure you want to apply fade out to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
+        const sample = samples[selectedSampleIndex];
+        if (sample) {
+          const originalSamples = sample.workSampleData();
+
+          const startFrame = Math.min(selection.startFrame, originalSamples.length - 1);
+          const endFrame = Math.min(selection.endFrame, originalSamples.length - 1);
+
+          const minFrame = Math.min(startFrame, endFrame);
+          const maxFrame = Math.max(startFrame, endFrame);
+
+          dispatch(fadeOutFrames({
+            sampleIndex: selectedSampleIndex,
+            startFrame: minFrame,
+            endFrame: maxFrame
+          }));
+
+          const updatedSample = samples[selectedSampleIndex];
+          if (updatedSample && updatedSample.getFile()) {
+            await updatedSample.reload(isHalfSpeed);
+            dispatch(selectSample(selectedSampleIndex));
+          }
+
+          setSelection(null); // Clear selection after applying fade out
+        }
+      }
+    }
+  }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
+
   if (selectedSampleIndex === null || !samples[selectedSampleIndex]) {
     return null;
   }
@@ -306,6 +385,8 @@ export function SampleEditor({
           selection={selection}
           onDeleteFrames={handleDeleteFrames}
           onCropFrames={handleCropFrames}
+          onFadeInFrames={handleFadeInFrames}
+          onFadeOutFrames={handleFadeOutFrames}
         />
       </div>
 
@@ -314,6 +395,7 @@ export function SampleEditor({
         isLoading={isLoading}
         onRemoveSample={handleRemoveSample}
         onPlaySample={handlePlaySample}
+        onRevertSample={handleRevertSample}
       />
     </div>
   );

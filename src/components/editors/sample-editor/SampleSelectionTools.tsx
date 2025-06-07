@@ -4,15 +4,19 @@ interface SampleSelectionToolsProps {
   selection: { startFrame: number; endFrame: number } | null;
   onDeleteFrames: () => void;
   onCropFrames: () => void;
+  onFadeInFrames?: () => void;
+  onFadeOutFrames?: () => void;
 }
 
 /**
- * Component for tools to manipulate selected frames (delete, crop)
+ * Component for tools to manipulate selected frames (delete, crop, fade in, fade out)
  */
 export function SampleSelectionTools({
   selection,
   onDeleteFrames,
-  onCropFrames
+  onCropFrames,
+  onFadeInFrames,
+  onFadeOutFrames
 }: SampleSelectionToolsProps) {
   if (!selection || selection.startFrame === selection.endFrame) {
     return null;
@@ -39,6 +43,24 @@ export function SampleSelectionTools({
         >
           Crop
         </button>
+        {onFadeInFrames && (
+          <button 
+            onClick={onFadeInFrames}
+            aria-label="Fade In"
+            className="fade-in-button"
+          >
+            Fade In
+          </button>
+        )}
+        {onFadeOutFrames && (
+          <button 
+            onClick={onFadeOutFrames}
+            aria-label="Fade Out"
+            className="fade-out-button"
+          >
+            Fade Out
+          </button>
+        )}
       </div>
     </div>
   );
