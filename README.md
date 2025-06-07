@@ -2,6 +2,9 @@
 
 This is a web port of the LSDPatcher application for Game Boy music creation.
 
+The application works locally on your computer without sending any data to the internet.
+You can access the online version at [https://lsdjs.laamaa.fi](https://lsdjs.laamaa.fi).
+
 ## Forewords
 The app was an experiment in doing a project completely using a LLM agent (Jetbrains Junie).
 I haven't looked at the code and probably don't even want to. It still seems to work, mostly(?)
