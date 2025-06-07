@@ -1,0 +1,67 @@
+.color-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: var(--gb-dark);
+  border: 4px solid var(--gb-light);
+}
+
+.color-selector-label {
+  font-size: 0.8rem;
+  color: var(--gb-lightest);
+  margin-bottom: 0.25rem;
+}
+
+.color-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.color-button {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--gb-light);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-0 {
+  background-color: white;
+}
+
+.color-1 {
+  background-color: lightgray;
+}
+
+.color-3 {
+  background-color: black;
+}
+
+.selected-left {
+  border: 2px solid blue;
+  box-shadow: 0 0 0 2px blue;
+}
+
+.selected-right {
+  border: 2px solid red;
+  box-shadow: 0 0 0 2px red;
+}
+
+@media (max-width: 768px) {
+  .color-selector {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .color-selector-label {
+    margin-right: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  .color-button {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}

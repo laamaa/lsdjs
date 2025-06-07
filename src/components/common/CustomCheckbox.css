@@ -1,0 +1,116 @@
+/* CustomCheckbox.css */
+.custom-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.custom-checkbox label {
+  min-width: 120px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.checkbox-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Hide the default checkbox input */
+.checkbox-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom checkbox visual */
+.checkbox-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: var(--gb-light);
+  border: 2px solid var(--gb-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Checked state */
+.checkbox-visual.checked {
+  background-color: var(--gb-dark);
+  border-color: var(--gb-darkest);
+}
+
+/* Checkmark icon */
+.checkbox-checkmark {
+  width: 16px;
+  height: 16px;
+  fill: var(--gb-lightest);
+}
+
+/* Hover state */
+.checkbox-input:not(:disabled) ~ .checkbox-visual:hover {
+  border-color: var(--gb-darkest);
+  transform: scale(1.05);
+}
+
+/* Focus state for accessibility */
+.checkbox-input:focus ~ .checkbox-visual {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Disabled state */
+.checkbox-visual.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--gb-light);
+  border-color: var(--gb-dark);
+}
+
+/* Color variants */
+.checkbox-visual.red.checked {
+  background-color: #ff5555;
+  border-color: #cc0000;
+}
+
+.checkbox-visual.green.checked {
+  background-color: #55ff55;
+  border-color: #00cc00;
+}
+
+.checkbox-visual.blue.checked {
+  background-color: #5555ff;
+  border-color: #0000cc;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .custom-checkbox {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .custom-checkbox label {
+    min-width: auto;
+    margin-bottom: 0.25rem;
+  }
+
+  .checkbox-visual {
+    width: 28px;
+    height: 28px;
+  }
+
+  .checkbox-checkmark {
+    width: 20px;
+    height: 20px;
+  }
+}

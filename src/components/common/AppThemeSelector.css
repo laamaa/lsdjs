@@ -1,0 +1,119 @@
+.app-theme-selector {
+  display: inline-block;
+  position: relative;
+}
+
+.theme-icon-button {
+  background-color: var(--gb-dark);
+  border: 3px solid var(--gb-light);
+  padding: 0.25rem;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--gb-darkest);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+}
+
+.theme-icon-button:hover {
+  background-color: var(--gb-light);
+}
+
+.theme-icon-button:active {
+  transform: translateY(2px);
+  box-shadow: 0px 0px 0 var(--gb-darkest);
+}
+
+.theme-icon {
+  fill: var(--gb-lightest);
+  width: 20px;
+  height: 20px;
+}
+
+.theme-icon-button:hover .theme-icon {
+  fill: var(--gb-darkest);
+}
+
+.theme-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  background-color: var(--gb-dark);
+  border: 3px solid var(--gb-light);
+  box-shadow: 4px 4px 0 var(--gb-darkest);
+  z-index: 100;
+  min-width: 180px;
+}
+
+.theme-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.theme-item {
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid var(--gb-light);
+  transition: background-color 0.1s ease;
+}
+
+.theme-item:last-child {
+  border-bottom: none;
+}
+
+.theme-item:hover {
+  background-color: var(--gb-light);
+}
+
+.theme-item:hover .theme-name {
+  color: var(--gb-darkest);
+}
+
+.theme-item.active {
+  background-color: var(--gb-darkest);
+}
+
+.theme-preview {
+  display: flex;
+  margin-right: 0.5rem;
+}
+
+.theme-preview span {
+  width: 8px;
+  height: 16px;
+}
+
+.theme-name {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.6rem;
+  color: var(--gb-lightest);
+  text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+  .theme-icon-button {
+    padding: 0.2rem;
+    border-width: 2px;
+  }
+
+  .theme-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .theme-dropdown {
+    min-width: 150px;
+  }
+
+  .theme-name {
+    font-size: 0.5rem;
+  }
+
+  .theme-preview span {
+    width: 6px;
+    height: 12px;
+  }
+}

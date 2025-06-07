@@ -1,0 +1,76 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Additional styles for SongManager component */
+.song-manager {
+
+}
+
+.controls {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.memory-usage {
+  margin-bottom: 1rem;
+}
+
+.memory-bar {
+  height: 20px;
+  background-color: var(--gb-light);
+  border: 1px solid var(--gb-darkest);
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+
+.memory-bar-used {
+  height: 100%;
+  background-color: var(--gb-dark);
+}
+
+.memory-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.song-list {
+  margin-top: 1rem;
+}
+
+.song-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.song-list th,
+.song-list td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--gb-light);
+}
+
+.song-list tr.selected {
+  background-color: var(--gb-dark);
+}
+
+.error-message {
+  color: #ff0000;
+  background-color: #ffeeee;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid #ff0000;
+  border-radius: 4px;
+}

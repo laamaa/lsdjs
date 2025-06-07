@@ -1,0 +1,278 @@
+/* KitEditor.css */
+.kit-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.kit-editor-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--gb-dark);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  background-color: rgba(255, 0, 0, 0.2);
+  border: 2px solid var(--gb-dark);
+  color: var(--gb-lightest);
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+}
+
+.bank-kit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.preferences-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0.25rem;
+  background-color: var(--gb-darkest);
+  color: var(--gb-lightest);
+  border: 3px solid var(--gb-light);
+  cursor: pointer;
+  font-size: 1.2rem;
+  box-shadow: 2px 2px 0 var(--gb-darkest);
+  transition: all 0.1s ease;
+}
+
+.preferences-icon.active {
+  background-color: var(--gb-dark);
+}
+
+.preferences-icon:hover {
+  background-color: var(--gb-light);
+  color: var(--gb-darkest);
+}
+
+.preferences-icon:active {
+  transform: translateY(2px);
+  box-shadow: 0px 0px 0 var(--gb-darkest);
+}
+
+.preferences-container {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preferences-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--gb-light);
+  border-radius: 4px;
+  background-color: var(--gb-darkest);
+}
+
+.sample-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sample-pad {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--gb-darkest);
+  color: var(--gb-lightest);
+  border: 2px solid var(--gb-light);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.1s ease;
+  position: relative;
+}
+
+.sample-pad.selected {
+  background-color: var(--gb-light);
+  color: var(--gb-darkest);
+  border-color: var(--gb-lightest);
+}
+
+.sample-pad.empty {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sample-pad:hover:not(.empty) {
+  background-color: var(--gb-dark);
+}
+
+.sample-pad:active:not(.empty) {
+  transform: scale(0.95);
+}
+
+.sample-pad .remove-button {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  border: 1px solid var(--gb-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.sample-pad .remove-button:hover {
+  background-color: var(--gb-darkest);
+}
+
+.kit-info {
+  margin-top: 1rem;
+}
+
+.kit-name {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.memory-bar {
+  height: 20px;
+  background-color: var(--gb-darkest);
+  border: 1px solid var(--gb-light);
+  margin-bottom: 0.5rem;
+}
+
+.memory-bar-used {
+  height: 100%;
+  background-color: var(--gb-light);
+}
+
+.sample-editor {
+  margin-top: 1rem;
+  border: 2px solid var(--gb-light);
+  border-radius: 4px;
+  padding: 1rem;
+  background-color: var(--gb-darkest);
+}
+
+.sample-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 150px;
+}
+
+.sample-waveform {
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.sample-waveform canvas {
+  width: 100%;
+  height: auto;
+}
+
+.sample-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .controls button {
+    width: 100%;
+  }
+
+  .bank-kit-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .bank-kit-header .preferences-icon {
+    align-self: flex-end;
+    margin-top: -2rem;
+  }
+
+  .sample-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .sample-pad {
+    width: 100%;
+    height: 0;
+    padding-bottom: 100%; /* Makes the height equal to the width */
+    position: relative;
+  }
+
+  .sample-pad span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .sample-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .control-group label {
+    min-width: 80px;
+  }
+
+  .sample-actions {
+    flex-direction: column;
+  }
+
+  .sample-actions button {
+    width: 100%;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 480px) {
+  .sample-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

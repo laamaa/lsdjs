@@ -1,0 +1,17 @@
+.sample-waveform-container {
+  width: 100%;
+}
+
+.sample-waveform {
+  display: block;
+  width: 100%;
+}
+
+.sample-waveform.clickable {
+  cursor: pointer;
+}
+
+/* When not clickable, show selection cursor */
+.sample-waveform:not(.clickable) {
+  cursor: crosshair;
+}

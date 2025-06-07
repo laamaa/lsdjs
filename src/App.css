@@ -1,0 +1,305 @@
+/* Game Boy-inspired styles */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* Game Boy color palette */
+:root {
+  --gb-lightest: #9BBC0F;  /* Lightest green */
+  --gb-light: #8BAC0F;     /* Light green */
+  --gb-dark: #306230;      /* Dark green */
+  --gb-darkest: #0F380F;   /* Darkest green */
+  --gb-bg: #0F380F;        /* Background color */
+  --gb-text: #9BBC0F;      /* Text color */
+  --gb-border: #8BAC0F;    /* Border color */
+  --gb-highlight: #9BBC0F; /* Highlight color */
+}
+
+/* Global styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Press Start 2P', cursive;
+  background-color: var(--gb-bg);
+  color: var(--gb-text);
+  line-height: 1.5;
+  image-rendering: pixelated;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 0 var(--gb-darkest);
+}
+
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.1rem; }
+h4, h5, h6 { font-size: 1rem; }
+
+p {
+  margin-top: 0;
+  line-height: 1.5;
+  font-size: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+/* Links */
+a {
+  color: var(--gb-lightest);
+  text-decoration: none;
+  position: relative;
+  padding: 0 2px;
+}
+
+a:hover {
+  color: var(--gb-light);
+  text-decoration: none;
+  background-color: var(--gb-dark);
+}
+
+a:active {
+  color: var(--gb-darkest);
+  background-color: var(--gb-lightest);
+}
+
+/* Form elements */
+input, select, textarea {
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.5rem;
+  border: 4px solid var(--gb-light);
+  background-color: var(--gb-darkest);
+  color: var(--gb-lightest);
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gb-lightest);
+  box-shadow: 0 0 0 2px var(--gb-dark);
+}
+
+button {
+  font-family: 'Press Start 2P', cursive;
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  border: 4px solid var(--gb-light);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  transition: all 0.1s ease;
+}
+
+button:hover {
+  background-color: var(--gb-light);
+  color: var(--gb-darkest);
+}
+
+button:active {
+  transform: translateY(2px);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-0 { margin-top: 0; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 1rem; }
+.mt-4 { margin-top: 1.5rem; }
+.mt-5 { margin-top: 2rem; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+.mb-5 { margin-bottom: 2rem; }
+
+/* Game Boy specific utility classes */
+.pixel-border {
+  border: 4px solid var(--gb-light);
+  box-shadow: 4px 4px 0 var(--gb-darkest);
+}
+
+.pixel-container {
+  background-color: var(--gb-dark);
+  border: 4px solid var(--gb-light);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.screen-container {
+  background-color: var(--gb-darkest);
+  border: 8px solid var(--gb-dark);
+  border-radius: 0;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.screen-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(155, 188, 15, 0.03),
+    rgba(155, 188, 15, 0.03) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+}
+
+/* Scanline effect */
+.scanline {
+  position: relative;
+}
+
+.scanline::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 50%,
+    rgba(15, 56, 15, 0.1) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Song Manager Styles */
+.song-manager {
+  width: 100%;
+}
+
+.song-manager .controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.song-manager .error-message {
+  background-color: rgba(255, 0, 0, 0.2);
+  border: 2px solid var(--gb-dark);
+  color: var(--gb-lightest);
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+}
+
+/* Memory Usage Bar */
+.memory-usage {
+  margin-bottom: 1.5rem;
+}
+
+.memory-bar {
+  height: 20px;
+  background-color: var(--gb-darkest);
+  border: 2px solid var(--gb-light);
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.memory-bar-used {
+  height: 100%;
+  background-color: var(--gb-light);
+  transition: width 0.3s ease;
+}
+
+.memory-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+}
+
+/* Song List */
+.song-list {
+  width: 100%;
+  overflow-x: auto;
+  max-width: 100vw; /* Ensure it doesn't exceed viewport width */
+}
+
+.song-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+
+.song-list th,
+.song-list td {
+  padding: 0.5rem;
+  text-align: left;
+  border: 2px solid var(--gb-dark);
+}
+
+.song-list th {
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  text-transform: uppercase;
+}
+
+.song-list tr {
+  background-color: var(--gb-darkest);
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.song-list tr:hover {
+  background-color: rgba(139, 172, 15, 0.1);
+}
+
+.song-list tr.selected {
+  background-color: rgba(139, 172, 15, 0.2);
+  border-left: 4px solid var(--gb-light);
+}
+
+.song-list td button {
+  margin-right: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .memory-stats {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .song-list th,
+  .song-list td {
+    padding: 0.25rem;
+    font-size: 0.6rem;
+  }
+
+  .song-list td button {
+    padding: 0.15rem 0.3rem;
+    font-size: 0.5rem;
+  }
+}
