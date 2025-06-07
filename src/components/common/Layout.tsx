@@ -19,7 +19,7 @@ export function Layout({ children }: LayoutProps) {
         {children}
       </main>
       <footer className="app-footer" role="contentinfo" aria-label="Application footer">
-        <p>LSDjs - Version 0.2.0</p>
+        <p>LSDjs - Version 0.2.0 | <a href="https://github.com/laamaa/lsdjs" target="_blank" rel="noopener noreferrer" className="footer-link">GitHub</a></p>
       </footer>
 
       <style>{`
@@ -70,6 +70,16 @@ export function Layout({ children }: LayoutProps) {
           border-top: 4px solid var(--gb-light);
           position: relative;
           z-index: 2;
+        }
+
+        .footer-link {
+          color: var(--gb-lightest);
+          text-decoration: underline;
+          transition: opacity 0.2s ease;
+        }
+
+        .footer-link:hover {
+          opacity: 0.8;
         }
 
         @media (min-width: 768px) {
