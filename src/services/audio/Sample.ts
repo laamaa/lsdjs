@@ -79,14 +79,14 @@ export class Sample {
   }
 
   /**
-   * Gets the name of the sample
+   * Gets the sample name
    */
   public getName(): string {
     return this.name;
   }
 
   /**
-   * Sets the name of the sample
+   * Sets the sample name, converting to uppercase and limiting to 3 characters
    * 
    * @param name - The new name for the sample
    */
@@ -157,7 +157,7 @@ export class Sample {
   }
 
   /**
-   * Gets the volume adjustment in decibels
+   * Gets the volume adjustment in decibels (0 = no adjustment)
    */
   public getVolumeDb(): number {
     return this.volumeDb;
@@ -165,15 +165,16 @@ export class Sample {
 
   /**
    * Sets the volume adjustment in decibels
+   * Higher values make the sample louder, lower values make it quieter
    * 
-   * @param value - The new volume adjustment
+   * @param value - The new volume adjustment in dB
    */
   public setVolumeDb(value: number): void {
     this.volumeDb = value;
   }
 
   /**
-   * Gets the pitch adjustment in semitones
+   * Gets the pitch adjustment in semitones (0 = no adjustment)
    */
   public getPitchSemitones(): number {
     return this.pitchSemitones;
@@ -181,15 +182,16 @@ export class Sample {
 
   /**
    * Sets the pitch adjustment in semitones
+   * Positive values increase pitch, negative values decrease pitch
    * 
-   * @param value - The new pitch adjustment
+   * @param value - The new pitch adjustment in semitones
    */
   public setPitchSemitones(value: number): void {
     this.pitchSemitones = value;
   }
 
   /**
-   * Gets the trim value in frames
+   * Gets the trim value in frames (0 = no trimming)
    */
   public getTrim(): number {
     return this.trim;
@@ -197,8 +199,9 @@ export class Sample {
 
   /**
    * Sets the trim value in frames
+   * Higher values trim more from the end of the sample
    * 
-   * @param value - The new trim value
+   * @param value - The new trim value (must be non-negative)
    */
   public setTrim(value: number): void {
     if (value < 0) {
@@ -209,6 +212,7 @@ export class Sample {
 
   /**
    * Gets whether dither is enabled
+   * Dither reduces quantization noise by adding small amounts of random noise
    */
   public getDither(): boolean {
     return this.dither;
@@ -216,30 +220,33 @@ export class Sample {
 
   /**
    * Sets whether dither is enabled
+   * Dither can improve audio quality when reducing bit depth
    * 
-   * @param value - The new dither value
+   * @param value - True to enable dither, false to disable
    */
   public setDither(value: boolean): void {
     this.dither = value;
   }
 
   /**
-   * Gets the file associated with this sample
+   * Gets the original file associated with this sample
+   * Returns null for samples created from ROM or other sources
    */
   public getFile(): File | null {
     return this.file;
   }
 
   /**
-   * Gets the unedited samples that will never be modified by pitch shifts
+   * Gets the original unmodified samples
+   * These samples are preserved for reverting edits and are never modified by operations
    */
   public getUneditedSamples(): Int16Array | null {
     return this.uneditedSamples;
   }
 
   /**
-   * Sets the original samples from the unedited samples
-   *
+   * Resets the working samples to the original unmodified state
+   * Used when reverting edits to restore the sample to its initial state
    */
   public setOriginalSamplesFromUnedited(): void {
     if (this.uneditedSamples) {
@@ -312,10 +319,8 @@ export class Sample {
     // If pitch is 0, no need to resample
     if (currentPitch === 0) {
       // Reset to unedited samples
-      if (this.uneditedSamples) {
-        this.originalSamples = this.uneditedSamples.slice();
-        this.processSamples();
-      }
+      this.originalSamples = this.uneditedSamples.slice();
+      this.processSamples();
       return true;
     }
 
@@ -473,8 +478,7 @@ export class Sample {
     inSampleRate: number,
     outSampleRate: number
   ): Int16Array {
-    // Simple linear interpolation resampling
-    // For a production app, a more sophisticated algorithm would be better
+    // Linear interpolation resampling
     const ratio = inSampleRate / outSampleRate;
     const outLength = Math.floor(samples.length / ratio);
     const result = new Int16Array(outLength);
@@ -503,11 +507,8 @@ export class Sample {
    * @returns The converted Int32Array
    */
   private toIntBuffer(shortBuffer: Int16Array): Int32Array {
-    const intBuffer = new Int32Array(shortBuffer.length);
-    for (let i = 0; i < shortBuffer.length; i++) {
-      intBuffer[i] = shortBuffer[i];
-    }
-    return intBuffer;
+    // Convert Int16Array to Int32Array for processing with higher precision
+    return Int32Array.from(shortBuffer);
   }
 
   /**
@@ -517,13 +518,8 @@ export class Sample {
    * @returns The converted Int16Array
    */
   private toInt16Buffer(intBuffer: Int32Array): Int16Array {
-    const shortBuffer = new Int16Array(intBuffer.length);
-    for (let i = 0; i < intBuffer.length; i++) {
-      let s = intBuffer[i];
-      s = Math.max(-32768, Math.min(32767, s));
-      shortBuffer[i] = s;
-    }
-    return shortBuffer;
+    // Convert Int32Array back to Int16Array with clamping to prevent overflow
+    return Int16Array.from(intBuffer, v => Math.max(-32768, Math.min(32767, v)));
   }
 
   /**
@@ -637,12 +633,7 @@ export class Sample {
    * @returns true if frames were deleted, false otherwise
    */
   public deleteFrames(startFrame: number, endFrame: number): boolean {
-    // Add console logs to track the execution flow
-    console.log('Sample.deleteFrames called with:', startFrame, endFrame);
-    console.log('originalSamples length:', this.originalSamples?.length);
-
-    if (!this.originalSamples || !this.uneditedSamples) {
-      console.log('No original samples, returning false');
+    if (!this.originalSamples) {
       return false; // Can't delete frames if we don't have original samples
     }
 
@@ -652,7 +643,6 @@ export class Sample {
 
     // Validate frame indices
     if (start < 0 || end >= this.originalSamples.length) {
-      console.log('Frame indices out of bounds, returning false');
       return false;
     }
 
@@ -669,9 +659,8 @@ export class Sample {
       newSamples[j] = this.originalSamples[i];
     }
 
-    // Update both the original samples and the unedited samples
+    // Update only the original samples, preserve uneditedSamples for revert functionality
     this.originalSamples = newSamples;
-    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
 
     // Process the samples with the updated data
     this.processSamples();
@@ -687,12 +676,7 @@ export class Sample {
    * @returns true if the sample was cropped, false otherwise
    */
   public cropFrames(startFrame: number, endFrame: number): boolean {
-    // Add console logs to track the execution flow
-    console.log('Sample.cropFrames called with:', startFrame, endFrame);
-    console.log('originalSamples length:', this.originalSamples?.length);
-
-    if (!this.originalSamples || !this.uneditedSamples) {
-      console.log('No original samples, returning false');
+    if (!this.originalSamples) {
       return false; // Can't crop frames if we don't have original samples
     }
 
@@ -702,7 +686,6 @@ export class Sample {
 
     // Validate frame indices
     if (start < 0 || end >= this.originalSamples.length) {
-      console.log('Frame indices out of bounds, returning false');
       return false;
     }
 
@@ -714,9 +697,8 @@ export class Sample {
       newSamples[j] = this.originalSamples[i];
     }
 
-    // Update both the original samples and the unedited samples
+    // Update only the original samples, preserve uneditedSamples for revert functionality
     this.originalSamples = newSamples;
-    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
 
     // Process the samples with the updated data
     this.processSamples();
@@ -732,11 +714,7 @@ export class Sample {
    * @returns true if the fade-in was applied, false otherwise
    */
   public fadeInFrames(startFrame: number, endFrame: number): boolean {
-    console.log('Sample.fadeInFrames called with:', startFrame, endFrame);
-    console.log('originalSamples length:', this.originalSamples?.length);
-
-    if (!this.originalSamples || !this.uneditedSamples) {
-      console.log('No original samples, returning false');
+    if (!this.originalSamples) {
       return false; // Can't apply fade-in if we don't have original samples
     }
 
@@ -746,17 +724,11 @@ export class Sample {
 
     // Validate frame indices
     if (start < 0 || end >= this.originalSamples.length) {
-      console.log('Frame indices out of bounds, returning false');
       return false;
     }
 
-    // Create a new array with the same length as the original
-    const newSamples = new Int16Array(this.originalSamples.length);
-
-    // Copy all samples
-    for (let i = 0; i < this.originalSamples.length; i++) {
-      newSamples[i] = this.originalSamples[i];
-    }
+    // Create a new array with a copy of the original samples
+    const newSamples = this.originalSamples.slice();
 
     // Apply fade-in to the selected range
     const rangeLength = end - start + 1;
@@ -767,9 +739,8 @@ export class Sample {
       newSamples[i] = Math.round(this.originalSamples[i] * fadeFactor);
     }
 
-    // Update both the original samples and the unedited samples
+    // Update only the original samples, preserve uneditedSamples for revert functionality
     this.originalSamples = newSamples;
-    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
 
     // Process the samples with the updated data
     this.processSamples();
@@ -785,11 +756,7 @@ export class Sample {
    * @returns true if the fade-out was applied, false otherwise
    */
   public fadeOutFrames(startFrame: number, endFrame: number): boolean {
-    console.log('Sample.fadeOutFrames called with:', startFrame, endFrame);
-    console.log('originalSamples length:', this.originalSamples?.length);
-
-    if (!this.originalSamples || !this.uneditedSamples) {
-      console.log('No original samples, returning false');
+    if (!this.originalSamples) {
       return false; // Can't apply fade-out if we don't have original samples
     }
 
@@ -799,17 +766,11 @@ export class Sample {
 
     // Validate frame indices
     if (start < 0 || end >= this.originalSamples.length) {
-      console.log('Frame indices out of bounds, returning false');
       return false;
     }
 
-    // Create a new array with the same length as the original
-    const newSamples = new Int16Array(this.originalSamples.length);
-
-    // Copy all samples
-    for (let i = 0; i < this.originalSamples.length; i++) {
-      newSamples[i] = this.originalSamples[i];
-    }
+    // Create a new array with a copy of the original samples
+    const newSamples = this.originalSamples.slice();
 
     // Apply fade-out to the selected range
     const rangeLength = end - start + 1;
@@ -820,9 +781,8 @@ export class Sample {
       newSamples[i] = Math.round(this.originalSamples[i] * fadeFactor);
     }
 
-    // Update both the original samples and the unedited samples
+    // Update only the original samples, preserve uneditedSamples for revert functionality
     this.originalSamples = newSamples;
-    this.uneditedSamples = newSamples.slice(); // Update unedited samples too
 
     // Process the samples with the updated data
     this.processSamples();
