@@ -92,6 +92,16 @@ export function FontEditor() {
     loadFontData(processor);
   }, [romData, romInfo, showGfxCharacters, loadFontData]);
 
+  // Ensure the first tile is selected after font data is loaded
+  // This is especially important for mobile Safari where the initial selection might not be displayed
+  useEffect(() => {
+    if (fontData.length > 0) {
+      // Explicitly set the selected tile to ensure it's displayed
+      console.log('Font data loaded, setting selected tile to 0');
+      setSelectedTile(0);
+    }
+  }, [fontData]);
+
 
   // Find the font offset in the ROM
   const findFontOffset = (romData: ArrayBuffer): number => {

@@ -127,9 +127,12 @@ export const FileService = {
 
     try {
       // Check if we should use the modern API
-      // Detect Firefox to avoid using File System Access API which it doesn't fully support
+      // Detect browsers with limited File System Access API support
       const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-      const useModernAPI = !isFirefox && 'showOpenFilePicker' in window;
+      const isMobileSafari = /iP(ad|hone|od)/.test(navigator.userAgent) && 
+                             /WebKit/.test(navigator.userAgent) && 
+                             !/(CriOS|FxiOS|OPiOS|mercury)/.test(navigator.userAgent);
+      const useModernAPI = !isFirefox && !isMobileSafari && 'showOpenFilePicker' in window;
 
       if (useModernAPI) {
         try {
@@ -185,9 +188,13 @@ export const FileService = {
         }
       }
 
-      // Log that we're using the fallback method for Firefox
+      // Log that we're using the fallback method
       if (isFirefox) {
         console.log('Using traditional file input method for Firefox');
+      }
+      if (isMobileSafari) {
+        console.log('Using traditional file input method for Mobile Safari');
+        console.log('Note: On iOS Safari, focus/blur events are handled differently for file inputs');
       }
 
       // Fallback method using traditional file input
@@ -205,6 +212,12 @@ export const FileService = {
           input.onchange = null;
           window.removeEventListener('focus', handleFocus);
           window.removeEventListener('blur', handleBlur);
+
+          // Clear the safety timeout if it exists
+          if (safetyTimeoutId !== null) {
+            window.clearTimeout(safetyTimeoutId);
+            safetyTimeoutId = null;
+          }
         };
 
         let filePickerOpened = false;
@@ -215,6 +228,19 @@ export const FileService = {
           // Only process if the file picker was opened and we haven't already processed the close
           if (filePickerOpened && !fileDialogClosed) {
             fileDialogClosed = true;
+
+            // Check if we're on mobile Safari
+            const isMobileSafari = /iP(ad|hone|od)/.test(navigator.userAgent) && 
+                                  /WebKit/.test(navigator.userAgent) && 
+                                  !/(CriOS|FxiOS|OPiOS|mercury)/.test(navigator.userAgent);
+
+            // On mobile Safari, don't automatically assume dialog was closed without selection
+            // as focus/blur events behave differently on iOS
+            if (isMobileSafari) {
+              // For mobile Safari, we'll rely solely on the change event
+              // and not trigger the "closed without selection" logic
+              return;
+            }
 
             // Small delay to allow the change event to fire first if a file was selected
             setTimeout(() => {
@@ -237,6 +263,9 @@ export const FileService = {
           console.log('File input change event fired');
           const target = event.target as HTMLInputElement;
           const files = target.files;
+
+          // Mark that we've handled the file dialog
+          fileDialogClosed = true;
 
           try {
             if (!files || files.length === 0) {
@@ -279,7 +308,17 @@ export const FileService = {
               return;
             }
 
-            console.log(`Successfully read file: ${fileName}`);
+            // Check if we're on mobile Safari for logging purposes
+            const isMobileSafari = /iP(ad|hone|od)/.test(navigator.userAgent) && 
+                                  /WebKit/.test(navigator.userAgent) && 
+                                  !/(CriOS|FxiOS|OPiOS|mercury)/.test(navigator.userAgent);
+
+            if (isMobileSafari) {
+              console.log(`Mobile Safari: Successfully read file: ${fileName}`);
+            } else {
+              console.log(`Successfully read file: ${fileName}`);
+            }
+
             cleanup();
             resolve({ fileName, fileExtension, content });
           } catch (error) {
@@ -296,12 +335,34 @@ export const FileService = {
         // Add the input to the document and trigger the click
         document.body.appendChild(input);
 
+        // Check if we're on mobile Safari
+        const isMobileSafari = /iP(ad|hone|od)/.test(navigator.userAgent) && 
+                              /WebKit/.test(navigator.userAgent) && 
+                              !/(CriOS|FxiOS|OPiOS|mercury)/.test(navigator.userAgent);
+
+        // For mobile Safari, add a safety timeout to ensure cleanup happens
+        // even if focus/blur events don't fire as expected
+        let safetyTimeoutId: number | null = null;
+        if (isMobileSafari) {
+          safetyTimeoutId = window.setTimeout(() => {
+            // Only clean up if we haven't already processed a file selection
+            if (!fileDialogClosed) {
+              console.log('Mobile Safari safety timeout triggered - cleaning up file input');
+              cleanup();
+              resolve(null);
+            }
+          }, 60000); // 1 minute timeout
+        }
+
         // Use setTimeout to ensure the input is in the DOM before clicking
         setTimeout(() => {
           try {
             input.click();
           } catch (error) {
             console.error('Error clicking file input:', error);
+            if (safetyTimeoutId !== null) {
+              window.clearTimeout(safetyTimeoutId);
+            }
             cleanup();
             resolve(null);
           }
@@ -358,9 +419,12 @@ export const FileService = {
         ? new Blob([data], { type: mimeType })
         : new Blob([data], { type: 'text/plain' });
 
-      // Detect Firefox to avoid using File System Access API which it doesn't fully support
+      // Detect browsers with limited File System Access API support
       const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-      const useModernAPI = !forceFallback && !isFirefox && 'showSaveFilePicker' in window;
+      const isMobileSafari = /iP(ad|hone|od)/.test(navigator.userAgent) && 
+                             /WebKit/.test(navigator.userAgent) && 
+                             !/(CriOS|FxiOS|OPiOS|mercury)/.test(navigator.userAgent);
+      const useModernAPI = !forceFallback && !isFirefox && !isMobileSafari && 'showSaveFilePicker' in window;
 
       if (useModernAPI) {
         try {
@@ -394,13 +458,46 @@ export const FileService = {
         }
       }
 
-      // Log that we're using the fallback method for Firefox
+      // Log that we're using the fallback method
       if (isFirefox) {
         console.log('Using traditional download method for Firefox');
       }
+      if (isMobileSafari) {
+        console.log('Using open-in-new-tab method for Mobile Safari');
+      }
 
-      // Fallback implementation
+      // Create a URL for the blob
       const url = URL.createObjectURL(blob);
+
+      // Special handling for Mobile Safari
+      if (isMobileSafari) {
+        // For Mobile Safari, open in a new tab to allow manual saving
+        // This works because Safari on iOS allows users to long-press and save the content
+        try {
+          // Open in a new tab
+          window.open(url, '_blank');
+
+          // Show a message to the user explaining how to save the file
+          // This could be replaced with a more sophisticated UI component
+          alert('To save the file on iOS:\n1. The file will open in a new tab\n2. Long-press on the content\n3. Select "Download" or "Save to Files"');
+
+          // Keep the URL alive longer for mobile Safari
+          await new Promise(resolve => setTimeout(resolve, 5000));
+
+          // Revoke the URL after a delay
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 60000); // Keep URL valid for 1 minute to give user time to save
+
+          return { success: true };
+        } catch (error) {
+          console.error('Error opening file in new tab:', error);
+          URL.revokeObjectURL(url);
+          throw error;
+        }
+      }
+
+      // Standard fallback for other browsers
       const a = document.createElement('a');
       a.href = url;
       a.download = suggestedName;

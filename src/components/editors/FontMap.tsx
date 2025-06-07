@@ -66,6 +66,9 @@ export function FontMap({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Log when the canvas is being drawn with the selected tile
+    console.log('Drawing FontMap canvas with selectedTile:', selectedTile);
+
     // Clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
