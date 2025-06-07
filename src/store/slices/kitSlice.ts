@@ -671,7 +671,7 @@ export const {
 
 // Define a type for the window object with our custom property
 interface CustomWindow extends Window {
-  __kitUpdateTimeout: number | null;
+  __kitUpdateTimeout: ReturnType<typeof setTimeout> | null;
 }
 
 // Create a middleware to update ROM data after kit modifications
@@ -709,7 +709,7 @@ export const kitMiddleware: Middleware = (store) => (next) => (action: unknown) 
   ) {
     // Use a debounced dispatch to prevent multiple rapid updates
     // Clear any existing timeout
-    const customWindow = window as CustomWindow;
+    const customWindow = window as unknown as CustomWindow;
     if (customWindow.__kitUpdateTimeout) {
       clearTimeout(customWindow.__kitUpdateTimeout);
     }
