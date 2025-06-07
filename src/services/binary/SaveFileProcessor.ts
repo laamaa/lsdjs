@@ -53,12 +53,54 @@ export interface SongInfo {
  */
 export const SaveFileProcessor = {
   /**
-   * Import a song from a .lsdprj file into the save file
-   * 
-   * @param processor - The BinaryProcessor containing the save file data
-   * @param songData - The song data from the .lsdprj file
-   * @returns The ID of the imported song, or null if import failed
+   * Searches for the next block ID pointer within a specific memory block while decoding commands.
+   *
+   * @param processor The instance of BinaryProcessor used to read memory contents.
+   * @param blockId The block ID to start searching within.
+   * @return The memory address of the next block ID pointer if found, or -1 if no pointer or the end of the song is encountered.
    */
+  findNextBlockIdPtr(processor: BinaryProcessor, blockId: number): number {
+    let ramPtr = SAV_CONSTANTS.BLOCK_START_PTR + blockId * SAV_CONSTANTS.BLOCK_SIZE;
+    let byteCounter = 0;
+
+    while (byteCounter < SAV_CONSTANTS.BLOCK_SIZE) {
+      if (processor.readUint8(ramPtr) === 0xc0) {
+        ramPtr++;
+        byteCounter++;
+        if (processor.readUint8(ramPtr) !== 0xc0) {
+          // RLE (Run-Length Encoding)
+          ramPtr++;
+          byteCounter++;
+        }
+      } else if (processor.readUint8(ramPtr) === 0xe0) {
+        const subCommand = processor.readUint8(ramPtr + 1);
+        switch (subCommand) {
+          case 0xe0:
+            // Literal 0xe0
+            ramPtr++;
+            byteCounter++;
+            break;
+          case 0xff:
+            // End of song
+            return -1;
+          case 0xf0: // Wave pattern
+          case 0xf1: // Instrument
+            ramPtr += 2;
+            byteCounter += 2;
+            break;
+          default:
+            // Found a block link pointer (E0 XX)
+            return ramPtr + 1;
+        }
+      }
+      ramPtr++;
+      byteCounter++;
+    }
+
+    // If we reach here, no next block ID pointer was found
+    return -1;
+  },
+
   importSongFromLsdprj(processor: BinaryProcessor, songData: ArrayBuffer): number | null {
     try {
       // Create a BinaryProcessor for the song data
@@ -76,11 +118,6 @@ export const SaveFileProcessor = {
       // Extract the song version (9th byte)
       const songVersion = songProcessor.readUint8(8);
 
-      // Calculate how many blocks we need for the song data
-      // Song data starts after the 9-byte header
-      const songDataSize = songData.byteLength - 9;
-      const blocksNeeded = Math.ceil(songDataSize / SAV_CONSTANTS.BLOCK_SIZE);
-
       // Find a free song slot
       let freeSongSlot = -1;
       for (let i = 0; i < SAV_CONSTANTS.SONG_COUNT; i++) {
@@ -93,13 +130,6 @@ export const SaveFileProcessor = {
       // If no free song slot was found, return null
       if (freeSongSlot === -1) {
         console.error('SaveFileProcessor.importSongFromLsdprj: No free song slot available');
-        return null;
-      }
-
-      // Check if we have enough free blocks
-      const freeBlocks = this.getFreeBlockCount(processor);
-      if (freeBlocks < blocksNeeded) {
-        console.error(`SaveFileProcessor.importSongFromLsdprj: Not enough free blocks. Need ${blocksNeeded}, have ${freeBlocks}`);
         return null;
       }
 
@@ -136,27 +166,56 @@ export const SaveFileProcessor = {
       const fileVersionPtr = SAV_CONSTANTS.FILE_VERSION_START_PTR + freeSongSlot;
       processor.writeUint8(fileVersionPtr, songVersion);
 
-      // Find free blocks and allocate them to the song
+      // Copy song data to blocks, handling block linking
       const totalBlocks = this.getTotalBlockCount(this.isSixtyFourKbRam(processor));
-      let blockAllocTablePtr = SAV_CONSTANTS.BLOCK_ALLOC_TABLE_START_PTR;
-      let allocatedBlocks = 0;
       let songDataOffset = 9; // Start after the 9-byte header
+      let remainingSongDataSize = songData.byteLength - 9;
+      let nextBlockIdPtr = 0; // 0 means this is the first block
 
-      for (let blockId = 0; blockId < totalBlocks && allocatedBlocks < blocksNeeded; blockId++) {
-        if (processor.readUint8(blockAllocTablePtr + blockId) === SAV_CONSTANTS.EMPTY_SLOT_VALUE) {
-          // Allocate this block to the song
-          processor.writeUint8(blockAllocTablePtr + blockId, freeSongSlot);
-
-          // Copy song data to this block
-          const blockPtr = SAV_CONSTANTS.BLOCK_START_PTR + blockId * SAV_CONSTANTS.BLOCK_SIZE;
-          const bytesToCopy = Math.min(SAV_CONSTANTS.BLOCK_SIZE, songDataSize - (allocatedBlocks * SAV_CONSTANTS.BLOCK_SIZE));
-
-          for (let byteIndex = 0; byteIndex < bytesToCopy; byteIndex++) {
-            const byteValue = songProcessor.readUint8(songDataOffset++);
-            processor.writeUint8(blockPtr + byteIndex, byteValue);
+      while (remainingSongDataSize > 0) {
+        // Find a free block
+        let blockId = -1;
+        for (let i = 0; i < totalBlocks; i++) {
+          // In the Java implementation, blocks are considered free if their value is < 0 or > 0x1f (31)
+          // Since we're using Uint8Array, values < 0 will be represented as values > 127
+          const tableValue = processor.readUint8(SAV_CONSTANTS.BLOCK_ALLOC_TABLE_START_PTR + i);
+          if (tableValue > 0x1f) {
+            blockId = i;
+            break;
           }
+        }
 
-          allocatedBlocks++;
+        if (blockId === -1) {
+          console.error('SaveFileProcessor.importSongFromLsdprj: No free blocks available');
+          return null;
+        }
+
+        // Allocate this block to the song
+        processor.writeUint8(SAV_CONSTANTS.BLOCK_ALLOC_TABLE_START_PTR + blockId, freeSongSlot);
+
+        // If this is not the first block, update the previous block's next block ID pointer
+        if (nextBlockIdPtr !== 0) {
+          // Add 1 to compensate for unused FAT block, matching Java implementation
+          processor.writeUint8(nextBlockIdPtr, blockId + 1);
+        }
+
+        // Copy song data to this block
+        const blockPtr = SAV_CONSTANTS.BLOCK_START_PTR + blockId * SAV_CONSTANTS.BLOCK_SIZE;
+        const bytesToCopy = Math.min(SAV_CONSTANTS.BLOCK_SIZE, remainingSongDataSize);
+
+        for (let byteIndex = 0; byteIndex < bytesToCopy; byteIndex++) {
+          const byteValue = songProcessor.readUint8(songDataOffset++);
+          processor.writeUint8(blockPtr + byteIndex, byteValue);
+        }
+
+        remainingSongDataSize -= bytesToCopy;
+
+        // Find the next block ID pointer in this block
+        nextBlockIdPtr = this.findNextBlockIdPtr(processor, blockId);
+
+        // If no next block ID pointer found or no more data to copy, we're done
+        if (nextBlockIdPtr === -1 || remainingSongDataSize <= 0) {
+          break;
         }
       }
 
@@ -541,12 +600,33 @@ export const SaveFileProcessor = {
 
     // Helper function to switch to a specific block
     const switchToBlock = (blockId: number): void => {
-      if (!songBlocks.has(blockId)) {
-        throw new Error(`Invalid block switch to block ${blockId}`);
+      // In the Java implementation, the block ID is used to calculate a memory address
+      // using the formula 0x8000 + blockSize * block. We need to find the actual block
+      // in our songBlocks Map that corresponds to this memory address.
+
+      // The block ID in the song data is 1-based (starting from 1) and may also have an offset
+      // to account for the FAT block. We need to adjust it to match our 0-based block IDs.
+
+      // First, try to find the block directly
+      if (songBlocks.has(blockId)) {
+        currentBlockId = blockId;
+        currentBlockOffset = 0;
+        currentBlock = songBlocks.get(currentBlockId)!;
+        return;
       }
-      currentBlockId = blockId;
-      currentBlockOffset = 0;
-      currentBlock = songBlocks.get(currentBlockId)!;
+
+      // If not found, try to find the block by its memory address
+      // Subtract 1 to convert from 1-based to 0-based indexing
+      const adjustedBlockId = blockId - 1;
+      if (songBlocks.has(adjustedBlockId)) {
+        currentBlockId = adjustedBlockId;
+        currentBlockOffset = 0;
+        currentBlock = songBlocks.get(currentBlockId)!;
+        return;
+      }
+
+      // If still not found, throw an error
+      throw new Error(`Invalid block switch to block ${blockId}`);
     };
 
     try {
