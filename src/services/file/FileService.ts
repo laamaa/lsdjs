@@ -126,8 +126,12 @@ export const FileService = {
     }
 
     try {
-      // Try modern API first if available
-      if ('showOpenFilePicker' in window) {
+      // Check if we should use the modern API
+      // Detect Firefox to avoid using File System Access API which it doesn't fully support
+      const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+      const useModernAPI = !isFirefox && 'showOpenFilePicker' in window;
+
+      if (useModernAPI) {
         try {
           const fileHandle = await window.showOpenFilePicker({
             types: accept ? [{
@@ -181,6 +185,11 @@ export const FileService = {
         }
       }
 
+      // Log that we're using the fallback method for Firefox
+      if (isFirefox) {
+        console.log('Using traditional file input method for Firefox');
+      }
+
       // Fallback method using traditional file input
       return new Promise((resolve) => {
         const input = document.createElement('input');
@@ -190,28 +199,48 @@ export const FileService = {
         }
 
         const cleanup = () => {
-          input.remove();
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
           input.onchange = null;
           window.removeEventListener('focus', handleFocus);
+          window.removeEventListener('blur', handleBlur);
         };
 
         let filePickerOpened = false;
+        let fileDialogClosed = false;
 
+        // Handle window focus (file dialog closed)
         const handleFocus = () => {
-          // File picker was closed
-          if (filePickerOpened && (!input.files || input.files.length === 0)) {
-            cleanup();
-            resolve(null);
+          // Only process if the file picker was opened and we haven't already processed the close
+          if (filePickerOpened && !fileDialogClosed) {
+            fileDialogClosed = true;
+
+            // Small delay to allow the change event to fire first if a file was selected
+            setTimeout(() => {
+              // If no files were selected, clean up and resolve null
+              if (!input.files || input.files.length === 0) {
+                console.log('File dialog closed without selection');
+                cleanup();
+                resolve(null);
+              }
+            }, 300);
           }
-          filePickerOpened = false;
+        };
+
+        // Handle window blur (file dialog opened)
+        const handleBlur = () => {
+          filePickerOpened = true;
         };
 
         input.onchange = async (event) => {
+          console.log('File input change event fired');
           const target = event.target as HTMLInputElement;
           const files = target.files;
 
           try {
             if (!files || files.length === 0) {
+              console.log('No files selected');
               cleanup();
               resolve(null);
               return;
@@ -230,31 +259,53 @@ export const FileService = {
 
             // Ensure we're properly reading the file content based on the binary flag
             let content;
-            if (binary) {
-              content = await file.arrayBuffer();
-              // Verify that we got a valid ArrayBuffer
-              if (!(content instanceof ArrayBuffer)) {
-                console.warn('Failed to read file as ArrayBuffer');
-                cleanup();
-                resolve(null);
-                return;
+            try {
+              if (binary) {
+                content = await file.arrayBuffer();
+                // Verify that we got a valid ArrayBuffer
+                if (!(content instanceof ArrayBuffer)) {
+                  console.warn('Failed to read file as ArrayBuffer');
+                  cleanup();
+                  resolve(null);
+                  return;
+                }
+              } else {
+                content = await file.text();
               }
-            } else {
-              content = await file.text();
+            } catch (readError) {
+              console.error('Error reading file:', readError);
+              cleanup();
+              resolve(null);
+              return;
             }
 
+            console.log(`Successfully read file: ${fileName}`);
             cleanup();
             resolve({ fileName, fileExtension, content });
           } catch (error) {
+            console.error('Error in file input change handler:', error);
             cleanup();
-            throw error;
+            resolve(null);
           }
         };
 
+        // Add event listeners for focus and blur
         window.addEventListener('focus', handleFocus);
+        window.addEventListener('blur', handleBlur);
+
+        // Add the input to the document and trigger the click
         document.body.appendChild(input);
-        filePickerOpened = true;
-        input.click();
+
+        // Use setTimeout to ensure the input is in the DOM before clicking
+        setTimeout(() => {
+          try {
+            input.click();
+          } catch (error) {
+            console.error('Error clicking file input:', error);
+            cleanup();
+            resolve(null);
+          }
+        }, 0);
 
       });
     } catch (error) {
@@ -307,7 +358,11 @@ export const FileService = {
         ? new Blob([data], { type: mimeType })
         : new Blob([data], { type: 'text/plain' });
 
-      if (!forceFallback && 'showSaveFilePicker' in window) {
+      // Detect Firefox to avoid using File System Access API which it doesn't fully support
+      const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+      const useModernAPI = !forceFallback && !isFirefox && 'showSaveFilePicker' in window;
+
+      if (useModernAPI) {
         try {
           const fileHandle = await window.showSaveFilePicker({
             suggestedName,
@@ -333,15 +388,15 @@ export const FileService = {
                 }
               };
             }
-            return {
-              success: false,
-              error: {
-                code: 'IO_ERROR',
-                message: error.message
-              }
-            };
+            console.warn('File System Access API error, falling back to traditional method:', error);
+            // Continue to fallback
           }
         }
+      }
+
+      // Log that we're using the fallback method for Firefox
+      if (isFirefox) {
+        console.log('Using traditional download method for Firefox');
       }
 
       // Fallback implementation

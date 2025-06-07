@@ -81,7 +81,7 @@ export function FontEditor() {
     // Calculate the offset for the first font (index 0)
     // In the Java implementation, fonts are defined in reverse order
     // and we need to adjust the index: (index + 1) % 3
-    const adjustedIndex = (0 + 1) % FONT_CONSTANTS.FONT_COUNT;
+    const adjustedIndex = (1) % FONT_CONSTANTS.FONT_COUNT;
     const firstFontOffset = fontOffset + adjustedIndex * FONT_CONSTANTS.FONT_SIZE + FONT_CONSTANTS.FONT_HEADER_SIZE;
 
     // Create a new font processor for the first font
@@ -144,7 +144,6 @@ export function FontEditor() {
   // Handle tile data changes
   const handleTileChange = (newTileData: number[][]) => {
     if (!fontProcessor) return;
-    console.log(newTileData);
     // Update the tile data in the processor
     for (let y = 0; y < 8; y++) {
       for (let x = 0; x < 8; x++) {

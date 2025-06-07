@@ -127,13 +127,39 @@ export function PaletteEditor() {
   useEffect(() => {
     // Load song image
     const songImg = new Image();
-    songImg.onload = () => setSongImage(songImg);
-    songImg.src = '/resources/song.bmp';
+    // Set crossOrigin to anonymous to avoid CORS issues in Firefox
+    songImg.crossOrigin = 'anonymous';
+    songImg.onload = () => {
+      // Ensure image is fully loaded with dimensions before setting
+      if (songImg.width > 0 && songImg.height > 0) {
+        setSongImage(songImg);
+      } else {
+        console.error('Song image loaded but dimensions are invalid');
+      }
+    };
+    songImg.onerror = (e) => {
+      console.error('Error loading song image:', e);
+    };
+    // Force image reload by adding cache-busting parameter
+    songImg.src = `/resources/song.bmp?t=${new Date().getTime()}`;
 
     // Load instrument image
     const instrImg = new Image();
-    instrImg.onload = () => setInstrImage(instrImg);
-    instrImg.src = '/resources/instr.bmp';
+    // Set crossOrigin to anonymous to avoid CORS issues in Firefox
+    instrImg.crossOrigin = 'anonymous';
+    instrImg.onload = () => {
+      // Ensure image is fully loaded with dimensions before setting
+      if (instrImg.width > 0 && instrImg.height > 0) {
+        setInstrImage(instrImg);
+      } else {
+        console.error('Instrument image loaded but dimensions are invalid');
+      }
+    };
+    instrImg.onerror = (e) => {
+      console.error('Error loading instrument image:', e);
+    };
+    // Force image reload by adding cache-busting parameter
+    instrImg.src = `/resources/instr.bmp?t=${new Date().getTime()}`;
   }, []);
 
   // Convert RGB555 to RGB
@@ -185,7 +211,13 @@ export function PaletteEditor() {
 
   // Function to update a preview canvas with the current palette
   const updatePreviewCanvas = useCallback((canvas: HTMLCanvasElement | null, image: HTMLImageElement) => {
-    if (!canvas || !palette) return;
+    if (!canvas || !palette || !image.complete) return;
+
+    // Ensure image has valid dimensions
+    if (image.width === 0 || image.height === 0) {
+      console.error('Image has invalid dimensions', image);
+      return;
+    }
 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
@@ -194,11 +226,25 @@ export function PaletteEditor() {
     canvas.width = image.width;
     canvas.height = image.height;
 
-    // Draw the original image
-    ctx.drawImage(image, 0, 0);
+    // Clear the canvas first (helps with Firefox rendering)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get image data to modify
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // Draw the original image
+    try {
+      ctx.drawImage(image, 0, 0);
+    } catch (error) {
+      console.error('Error drawing image to canvas:', error);
+      return;
+    }
+
+    // Get image data to modify - wrap in try/catch for Firefox
+    let imageData;
+    try {
+      imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } catch (error) {
+      console.error('Error getting image data from canvas:', error);
+      return;
+    }
     const data = imageData.data;
 
     // Get palette colors
@@ -252,23 +298,37 @@ export function PaletteEditor() {
     }
 
     // Put the modified image data back
-    ctx.putImageData(imageData, 0, 0);
+    try {
+      ctx.putImageData(imageData, 0, 0);
+    } catch (error) {
+      console.error('Error putting image data back to canvas:', error);
+    }
   }, [palette, applyColorSpace, rgb555ToRgb]);
 
   // Helper function to update both preview canvases
   const updatePreviews = useCallback(() => {
-    if (!palette || !songImage || !instrImage) return;
+    if (!palette) return;
 
-    // Update song preview
-    updatePreviewCanvas(songCanvasRef.current, songImage);
+    // Only update if images are loaded and have dimensions
+    if (songImage && songImage.complete && songImage.width > 0) {
+      updatePreviewCanvas(songCanvasRef.current, songImage);
+    }
 
-    // Update instrument preview
-    updatePreviewCanvas(instrCanvasRef.current, instrImage);
+    if (instrImage && instrImage.complete && instrImage.width > 0) {
+      updatePreviewCanvas(instrCanvasRef.current, instrImage);
+    }
   }, [palette, songImage, instrImage, updatePreviewCanvas]);
 
   // Update the preview canvases when the palette or images change
   useEffect(() => {
     updatePreviews();
+
+    // Add a small delay and update again to ensure Firefox renders correctly
+    const timeoutId = setTimeout(() => {
+      updatePreviews();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [updatePreviews]);
 
   // Helper function to get a color set by index
@@ -320,12 +380,16 @@ export function PaletteEditor() {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    // Get the pixel color at the clicked position
-    const pixel = ctx.getImageData(x, y, 1, 1).data;
-    const pixelColor = Number(`0xff${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`);
+    // Get the pixel color at the clicked position - wrap in try/catch for Firefox
+    try {
+      const pixel = ctx.getImageData(x, y, 1, 1).data;
+      const pixelColor = Number(`0xff${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`);
 
-    // Select the appropriate swatch based on the color
-    selectColorFromPixel(pixelColor);
+      // Select the appropriate swatch based on the color
+      selectColorFromPixel(pixelColor);
+    } catch (error) {
+      console.error('Error getting pixel data at click position:', error);
+    }
   }, [palette, selectColorFromPixel]);
 
   // Handle palette selection
