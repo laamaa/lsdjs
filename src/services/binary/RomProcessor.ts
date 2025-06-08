@@ -332,4 +332,41 @@ export const RomProcessor = {
     }
     return baseOffset - 15;
   },
+
+  /**
+   * Fix the checksums in the ROM header
+   * This is required for the ROM to be valid and work on real hardware or emulators
+   * Based on the original Java implementation in RomUtilities.java
+   * 
+   * @param romData - The ROM data as an ArrayBuffer
+   * @returns The ROM data with fixed checksums
+   */
+  fixChecksum(romData: ArrayBuffer): ArrayBuffer {
+    // Create a copy of the ROM data to avoid mutating the original
+    const romCopy = new ArrayBuffer(romData.byteLength);
+    new Uint8Array(romCopy).set(new Uint8Array(romData));
+
+    const romView = new Uint8Array(romCopy);
+
+    // Calculate the header checksum (0x14D)
+    let checksum014D = 0;
+    for (let i = 0x134; i < 0x14D; ++i) {
+      checksum014D = checksum014D - romView[i] - 1;
+    }
+    romView[0x14D] = checksum014D & 0xFF;
+
+    // Calculate the global checksum (0x14E-0x14F)
+    let checksum014E = 0;
+    for (let i = 0; i < romView.length; ++i) {
+      if (i === 0x14E || i === 0x14F) {
+        continue;
+      }
+      checksum014E += romView[i] & 0xFF;
+    }
+
+    romView[0x14E] = (checksum014E & 0xFF00) >> 8;
+    romView[0x14F] = checksum014E & 0x00FF;
+
+    return romCopy;
+  },
 };

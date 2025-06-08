@@ -72,9 +72,12 @@ export const exportRomFile = createAsyncThunk<ExportRomFileResult, void>(
         );
       }
 
+      // Fix the ROM checksums to ensure the file is valid
+      const fixedRomData = RomProcessor.fixChecksum(updatedRomData);
+
       // Use FileService to save the updated ROM file data as a binary .gb file
       const fileExtension = romInfo.title.toLowerCase().includes('color') ? '.gbc' : '.gb';
-      const result = await FileService.saveFile(updatedRomData, {
+      const result = await FileService.saveFile(fixedRomData, {
         suggestedName: `${romInfo.title.trim() || 'lsdj'}${fileExtension}`,
         mimeType: 'application/octet-stream'
       });
