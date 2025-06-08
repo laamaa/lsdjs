@@ -97,12 +97,17 @@ This project uses Vite as its build system, replacing the deprecated react-scrip
 - Optimized production builds
 - TypeScript support out of the box
 - Testing with Vitest
+- Cache busting for static assets
 
 ### Important Build Configuration Notes
 
 - The project requires an `index.html` file in the root directory (not just in the public directory) as the entry point for Vite.
 - The Vite configuration (`vite.config.ts`) explicitly sets the root directory to '.' and the public directory to 'public' to ensure the build process works correctly.
 - If you encounter build errors, verify that the index.html file exists in the root directory and that the paths in the file are correct.
+
+### Cache Busting
+
+The application implements cache busting for static assets to ensure users always get the latest version when updates are deployed. This is achieved through content hashing, where a unique hash based on the file's content is added to the filename.
 
 ### Environment Variables
 

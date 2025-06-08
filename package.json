@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src --ext ts,tsx",
-    "lint:fix": "eslint src --ext ts,tsx --fix"
+    "lint:fix": "eslint src --ext ts,tsx --fix",
+    "test:cache-busting": "npm run build && node scripts/verify-cache-busting.js"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",

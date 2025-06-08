@@ -85,4 +85,9 @@
   .sample-actions {
     justify-content: space-between;
   }
+
+  .selection-buttons {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
 }

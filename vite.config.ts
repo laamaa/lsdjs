@@ -22,6 +22,14 @@ export default defineConfig({
   build: {
     outDir: 'build', // Match the output directory used by react-scripts
     sourcemap: true,
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]'
+      }
+    }
   },
   test: {
     globals: true,

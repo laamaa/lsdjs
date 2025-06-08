@@ -97,7 +97,6 @@ export function FontEditor() {
   useEffect(() => {
     if (fontData.length > 0) {
       // Explicitly set the selected tile to ensure it's displayed
-      console.log('Font data loaded, setting selected tile to 0');
       setSelectedTile(0);
     }
   }, [fontData]);
