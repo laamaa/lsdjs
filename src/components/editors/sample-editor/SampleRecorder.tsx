@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useAppDispatch, useAppSelector, addRecordedSample } from '../../../store';
+import { useAppDispatch, addRecordedSample } from '../../../store';
 
 interface SampleRecorderProps {
   isLoading: boolean;
@@ -10,8 +10,7 @@ interface SampleRecorderProps {
  */
 export function SampleRecorder({ isLoading }: SampleRecorderProps) {
   const dispatch = useAppDispatch();
-  const { kitInfo } = useAppSelector(state => state.kit);
-
+  // We need to access the state for isHalfSpeed
   const [isRecording, setIsRecording] = useState(false);
   const [isRecordingAvailable, setIsRecordingAvailable] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -157,7 +156,6 @@ export function SampleRecorder({ isLoading }: SampleRecorderProps) {
         aria-label="Record sample"
         title={isRecordingAvailable ? 'Hold to record. Release to stop. You can edit the sample before saving to kit.' : 'Recording not available'}
       >
-        {isRecording ? 'Recording...' : 'Record'}
       </button>
     </div>
   );

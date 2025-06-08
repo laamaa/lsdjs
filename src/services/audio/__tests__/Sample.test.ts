@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Sample } from '../Sample';
+import { Sample } from '../sample';
 
 describe('Sample', () => {
   describe('fadeInFrames', () => {

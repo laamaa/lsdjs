@@ -119,7 +119,10 @@ const serializableToSample = (serializable: SerializableSample): Sample => {
   sample.setDither(serializable.dither);
 
   // Set originalSamples to enable editing operations
-  (sample as any).originalSamples = sampleData.slice();
+  sample.setOriginalSamples(sampleData.slice());
+
+  // Also set uneditedSamples to ensure proper revert functionality
+  sample.setUneditedSamples(sampleData.slice());
 
   // Process the samples to apply the settings
   sample.processSamples();
@@ -152,7 +155,7 @@ export const loadKitFromRomBank = createAsyncThunk<LoadKitFromRomBankResult, { r
   async ({ romData, bankIndex }, { rejectWithValue }) => {
     try {
       // Extract the kit from the ROM bank
-      const { samples, kitName } = SampleBankCompiler.extractFromRomBank(romData, bankIndex);
+      const { samples, kitName } = await SampleBankCompiler.extractFromRomBank(romData, bankIndex);
 
       // Calculate total sample size and bytes free
       const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(samples);
@@ -219,7 +222,7 @@ export const loadKitFromFile = createAsyncThunk<LoadKitResult, void>(
       new Uint8Array(newRomData).set(new Uint8Array(fileData), bankOffset);
 
       // Extract the kit from the ROM bank
-      const { samples, kitName } = SampleBankCompiler.extractFromRomBank(newRomData, bankIndex);
+      const { samples, kitName } = await SampleBankCompiler.extractFromRomBank(newRomData, bankIndex);
 
       // Calculate total sample size and bytes free
       const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(samples);

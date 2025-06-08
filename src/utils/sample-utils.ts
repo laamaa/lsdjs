@@ -9,6 +9,11 @@
  * @returns Uint8Array of packed nibbles for visualization
  */
 export function convertSampleDataForWaveform(sampleData: Int16Array): Uint8Array {
+  // Ensure we have a valid sample data array
+  if (!sampleData || sampleData.length === 0) {
+    return new Uint8Array(0);
+  }
+
   const packedData = new Uint8Array(Math.ceil(sampleData.length / 2));
 
   for (let i = 0; i < packedData.length; i++) {
@@ -36,7 +41,7 @@ export function convertSampleDataForWaveform(sampleData: Int16Array): Uint8Array
  */
 export function calculateSampleDuration(sampleLength: number, isHalfSpeed: boolean): number {
   const sampleRate = isHalfSpeed ? 5734 : 11468;
-  return sampleLength / (sampleRate * 2);
+  return sampleLength / sampleRate;
 }
 
 /**

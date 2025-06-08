@@ -3,5 +3,5 @@
  */
 
 export * from './AudioService';
-export * from './Sample';
+export * from './sample';
 export * from './SampleBankCompiler';

@@ -5,7 +5,7 @@
  * Based on the original Java implementation in sbc.java.
  */
 
-import { Sample } from './Sample';
+import { Sample } from './sample';
 
 /**
  * Service for compiling samples into the format required by the LSDj ROM
@@ -240,12 +240,12 @@ export const SampleBankCompiler = {
    * 
    * @param romData - The ROM data
    * @param bankIndex - The bank index to read from
-   * @returns An object containing the samples and kit name
+   * @returns A promise that resolves to an object containing the samples and kit name
    */
-  extractFromRomBank(
+  async extractFromRomBank(
     romData: ArrayBuffer,
     bankIndex: number
-  ): { samples: (Sample | null)[]; kitName: string } {
+  ): Promise<{ samples: (Sample | null)[]; kitName: string }> {
     const BANK_SIZE = 0x4000; // 16,384 bytes
     const MAX_SAMPLES = 15;
 
@@ -306,9 +306,9 @@ export const SampleBankCompiler = {
       // Unswizzle if necessary
       if (isSwizzled) {
         const unswizzled = this.unswizzle(nibbles);
-        samples[sampleIt] = Sample.createFromNibbles(unswizzled, name);
+        samples[sampleIt] = await Sample.createFromNibbles(unswizzled, name);
       } else {
-        samples[sampleIt] = Sample.createFromNibbles(nibbles, name);
+        samples[sampleIt] = await Sample.createFromNibbles(nibbles, name);
       }
     }
 

@@ -353,8 +353,7 @@ export function SampleEditor({
   // Convert the serializable sample to a Sample object if it exists
   const tempSample = tempRecordedSample ? serializableToSample(tempRecordedSample) : null;
 
-  // Create a temporary sample array with just the recorded sample if it exists
-  const tempSamples = tempSample ? [tempSample] : [];
+  // tempSample is used directly, no need to create an array
 
   // Create handlers for the temporary sample
   const handleSaveToKit = useCallback(() => {
@@ -427,6 +426,7 @@ export function SampleEditor({
           dither={tempSample.getDither()}
           maxTrim={Math.max(0, Math.floor(tempSample.untrimmedLengthInSamples() / 32) - 1)}
           isLoading={isLoading}
+          disableControls={true} // Disable volume, pitch, and trim controls for newly recorded samples
           onUpdateVolume={(value) => {
             tempSample.setVolumeDb(value);
             tempSample.processSamples();
