@@ -84,6 +84,8 @@ export function SampleWaveform({
   onSelection,
   selection,
 }: SampleWaveformProps) {
+  // Constant for arrow key frame increment
+  const ARROW_KEY_FRAME_INCREMENT = 64;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerWidth, setContainerWidth] = useState(width || 300);
@@ -173,15 +175,10 @@ export function SampleWaveform({
     };
   }, [width]);
 
-  // Reset selection when data changes
-  useEffect(() => {
-    // Clear selection when sample data changes
-    setSelectionStart(null);
-    setSelectionEnd(null);
-    if (onSelection) {
-      onSelection(null);
-    }
-  }, [data, onSelection]);
+  // We no longer reset selection when data changes
+  // This allows selections to persist when adjusting sample parameters
+  // The selection will only be cleared when explicitly requested
+  // or when the component unmounts
 
   // Update internal selection state when selection prop changes
   useEffect(() => {
@@ -228,7 +225,24 @@ export function SampleWaveform({
     // Calculate the frame index based on the pixel position
     // Each byte in data contains 2 samples (high and low nibbles)
     const totalSamples = data.length * 2;
-    const frameIndex = Math.round((pixelX / containerWidth) * totalSamples);
+
+    // Calculate the normalized position (0 to 1)
+    const normalizedPosition = pixelX / containerWidth;
+
+    // Define edge snap threshold (percentage of width)
+    const edgeSnapThreshold = 0.02; // 2% of the width
+
+    // Snap to edges if close enough
+    if (normalizedPosition <= edgeSnapThreshold) {
+      // Snap to start (frame 0)
+      return 0;
+    } else if (normalizedPosition >= 1 - edgeSnapThreshold) {
+      // Snap to end (last frame)
+      return totalSamples - 1;
+    }
+
+    // Regular calculation for positions not near edges
+    const frameIndex = Math.round(normalizedPosition * totalSamples);
 
     // Ensure the frame index is within bounds
     return Math.max(0, Math.min(totalSamples - 1, frameIndex));
@@ -301,15 +315,19 @@ export function SampleWaveform({
 
     // Update selection end
     const frameIndex = pixelToFrameIndex(x);
-    setSelectionEnd(frameIndex);
 
-    // Notify parent component of selection
-    if (onSelection && selectionStart !== null) {
-      // Pass the actual selection start and end without reordering
-      // This preserves the direction of the selection
-      onSelection({ startFrame: selectionStart, endFrame: frameIndex });
+    // Only update if the selection end has changed
+    if (frameIndex !== selectionEnd) {
+      setSelectionEnd(frameIndex);
+
+      // Notify parent component of selection
+      if (onSelection && selectionStart !== null) {
+        // Pass the actual selection start and end without reordering
+        // This preserves the direction of the selection
+        onSelection({ startFrame: selectionStart, endFrame: frameIndex });
+      }
     }
-  }, [isSelecting, data, onSelection, selectionStart, getPositionFromEvent, pixelToFrameIndex]);
+  }, [isSelecting, data, onSelection, selectionStart, selectionEnd, getPositionFromEvent, pixelToFrameIndex]);
 
   // Handle mouse move event to update selection
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -341,6 +359,7 @@ export function SampleWaveform({
       }
     }
   }, [selectionStart, selectionEnd, onSelection]);
+
 
   // Handle mouse up event to end selection
   const handleMouseUp = useCallback(() => {
@@ -425,7 +444,9 @@ export function SampleWaveform({
       // Extend selection with arrow keys
       if (e.key === 'ArrowRight' && selectionStart !== null && selectionEnd !== null) {
         e.preventDefault();
-        const newEnd = Math.min(totalFrames - 1, selectionEnd + 1);
+        // Use increment of 1 when Shift is pressed, otherwise use ARROW_KEY_FRAME_INCREMENT
+        const increment = e.shiftKey ? 1 : ARROW_KEY_FRAME_INCREMENT;
+        const newEnd = Math.min(totalFrames - 1, selectionEnd + increment);
         setSelectionEnd(newEnd);
 
         if (onSelection) {
@@ -435,11 +456,56 @@ export function SampleWaveform({
 
       if (e.key === 'ArrowLeft' && selectionStart !== null && selectionEnd !== null) {
         e.preventDefault();
-        const newEnd = Math.max(0, selectionEnd - 1);
+        // Use increment of 1 when Shift is pressed, otherwise use ARROW_KEY_FRAME_INCREMENT
+        const increment = e.shiftKey ? 1 : ARROW_KEY_FRAME_INCREMENT;
+        const newEnd = Math.max(0, selectionEnd - increment);
         setSelectionEnd(newEnd);
 
         if (onSelection) {
           onSelection({ startFrame: selectionStart, endFrame: newEnd });
+        }
+      }
+
+      // Home key: Select from current start to beginning of sample
+      if (e.key === 'Home' && selectionStart !== null && selectionEnd !== null) {
+        e.preventDefault();
+        setSelectionEnd(0);
+
+        if (onSelection) {
+          onSelection({ startFrame: selectionStart, endFrame: 0 });
+        }
+      }
+
+      // End key: Select from current start to end of sample
+      if (e.key === 'End' && selectionStart !== null && selectionEnd !== null) {
+        e.preventDefault();
+        setSelectionEnd(totalFrames - 1);
+
+        if (onSelection) {
+          onSelection({ startFrame: selectionStart, endFrame: totalFrames - 1 });
+        }
+      }
+
+      // Shift+Home: Start new selection from beginning
+      if (e.key === 'Home' && e.shiftKey) {
+        e.preventDefault();
+        setSelectionStart(0);
+        setSelectionEnd(0);
+
+        if (onSelection) {
+          onSelection({ startFrame: 0, endFrame: 0 });
+        }
+      }
+
+      // Shift+End: Start new selection from end
+      if (e.key === 'End' && e.shiftKey) {
+        e.preventDefault();
+        const lastFrame = totalFrames - 1;
+        setSelectionStart(lastFrame);
+        setSelectionEnd(lastFrame);
+
+        if (onSelection) {
+          onSelection({ startFrame: lastFrame, endFrame: lastFrame });
         }
       }
 
@@ -471,6 +537,7 @@ export function SampleWaveform({
         tabIndex={0}
         aria-roledescription="Waveform visualization"
         aria-readonly={!!onClick}
+        aria-description="Drag to select a range. The edges of the waveform have larger hit areas for easier selection. Use arrow keys to move selection by 64 frames, or Shift+arrow keys for fine-grained selection (1 frame). Use Home key to select to the start, End key to select to the end. Use Shift+Home to start selection at beginning, Shift+End to start at end."
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -488,17 +555,42 @@ export function SampleWaveform({
 
         {/* Selection area */}
         {selectionStart !== null && selectionEnd !== null && !onClick && (
-          <rect
-            x={Math.min(frameToPixel(selectionStart), frameToPixel(selectionEnd))}
-            y="0"
-            width={Math.abs(frameToPixel(selectionEnd) - frameToPixel(selectionStart))}
-            height="100%"
-            fill="var(--gb-highlight)"
-            fillOpacity="0.3"
-            stroke="var(--gb-highlight)"
-            strokeWidth="1"
-            strokeOpacity="0.8"
-          />
+          <>
+            <rect
+              x={Math.min(frameToPixel(selectionStart), frameToPixel(selectionEnd))}
+              y="0"
+              width={Math.abs(frameToPixel(selectionEnd) - frameToPixel(selectionStart))}
+              height="100%"
+              fill="var(--gb-highlight)"
+              fillOpacity="0.3"
+              stroke="var(--gb-highlight)"
+              strokeWidth="1"
+              strokeOpacity="0.8"
+            />
+
+            {/* Edge indicators for selection boundaries */}
+            {(selectionStart === 0 || selectionEnd === 0) && (
+              <rect
+                x="0"
+                y="0"
+                width="4"
+                height={height}
+                fill="var(--gb-highlight)"
+                fillOpacity="0.6"
+              />
+            )}
+
+            {(selectionStart === (data?.length ?? 0) * 2 - 1 || selectionEnd === (data?.length ?? 0) * 2 - 1) && (
+              <rect
+                x={containerWidth - 4}
+                y="0"
+                width="4"
+                height={height}
+                fill="var(--gb-highlight)"
+                fillOpacity="0.6"
+              />
+            )}
+          </>
         )}
 
         {/* Waveform path */}

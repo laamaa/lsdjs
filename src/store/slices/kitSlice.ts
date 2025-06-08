@@ -49,6 +49,19 @@ export interface KitInfo {
   bytesFree: number;
 }
 
+// Define a serializable representation of a Sample
+interface SerializableSample {
+  name: string;
+  sampleData: number[]; // Serialized Int16Array
+  untrimmedLength: number;
+  readPos: number;
+  volumeDb: number;
+  pitchSemitones: number;
+  trim: number;
+  dither: boolean;
+  halfSpeed: boolean;
+}
+
 // Define the kit state interface
 interface KitState {
   kitInfo: KitInfo | null;
@@ -59,6 +72,8 @@ interface KitState {
   useGbaPolarity: boolean;
   isLoading: boolean;
   error: string | null;
+  // Temporary sample for editing before adding to kit (serializable version)
+  tempRecordedSample: SerializableSample | null;
 }
 
 // Helper function to calculate total sample size and bytes free
@@ -74,6 +89,44 @@ const calculateSampleSizeAndBytesFree = (samples: (Sample | WritableDraft<Sample
   };
 };
 
+// Helper function to convert a Sample to a SerializableSample
+const sampleToSerializable = (sample: Sample): SerializableSample => {
+  return {
+    name: sample.getName(),
+    sampleData: Array.from(sample.workSampleData()), // Convert Int16Array to regular array
+    untrimmedLength: sample.untrimmedLengthInSamples(),
+    readPos: 0, // Reset read position
+    volumeDb: sample.getVolumeDb(),
+    pitchSemitones: sample.getPitchSemitones(),
+    trim: sample.getTrim(),
+    dither: sample.getDither(),
+    halfSpeed: false // Default to false, will be set by component
+  };
+};
+
+// Helper function to convert a SerializableSample to a Sample
+const serializableToSample = (serializable: SerializableSample): Sample => {
+  // Create a new Int16Array from the serialized data
+  const sampleData = new Int16Array(serializable.sampleData);
+
+  // Create a new Sample with the data
+  const sample = new Sample(sampleData, serializable.name);
+
+  // Set all the properties
+  sample.setVolumeDb(serializable.volumeDb);
+  sample.setPitchSemitones(serializable.pitchSemitones);
+  sample.setTrim(serializable.trim);
+  sample.setDither(serializable.dither);
+
+  // Set originalSamples to enable editing operations
+  (sample as any).originalSamples = sampleData.slice();
+
+  // Process the samples to apply the settings
+  sample.processSamples();
+
+  return sample;
+};
+
 // Define the initial state
 const initialState: KitState = {
   kitInfo: null,
@@ -84,6 +137,7 @@ const initialState: KitState = {
   useGbaPolarity: false,
   isLoading: false,
   error: null,
+  tempRecordedSample: null,
 };
 
 // Define return type for loadKitFromRomBank thunk
@@ -240,6 +294,107 @@ interface AddSampleResult {
   canceled?: boolean;
 }
 
+// Define return type for addRecordedSample thunk
+interface AddRecordedSampleResult {
+  sampleData: number[]; // Serializable array of sample data
+  sampleName: string;
+}
+
+// Helper function to resample audio data
+const resampleAudio = (samples: Int16Array, inSampleRate: number, outSampleRate: number): Int16Array => {
+  // Linear interpolation resampling
+  const ratio = inSampleRate / outSampleRate;
+  const outLength = Math.floor(samples.length / ratio);
+  const result = new Int16Array(outLength);
+
+  for (let i = 0; i < outLength; i++) {
+    const position = i * ratio;
+    const index = Math.floor(position);
+    const fraction = position - index;
+
+    if (index >= samples.length - 1) {
+      result[i] = samples[samples.length - 1];
+    } else {
+      result[i] = Math.round(
+        samples[index] * (1 - fraction) + samples[index + 1] * fraction
+      );
+    }
+  }
+
+  return result;
+};
+
+// Create an async thunk for adding a recorded sample to temporary state for editing
+export const addRecordedSample = createAsyncThunk<AddRecordedSampleResult, { audioBuffer: AudioBuffer }>(
+  'kit/addRecordedSample',
+  async ({ audioBuffer }, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const { isHalfSpeed } = state.kit;
+
+      // Convert AudioBuffer to Int16Array
+      const channelData = audioBuffer.getChannelData(0);
+      const sampleData = new Int16Array(channelData.length);
+
+      // Convert Float32 (-1.0 to 1.0) to Int16 (-32768 to 32767)
+      for (let i = 0; i < channelData.length; i++) {
+        sampleData[i] = Math.max(-32768, Math.min(32767, Math.round(channelData[i] * 32767)));
+      }
+
+      // Get the original sample rate from the AudioBuffer
+      const inSampleRate = audioBuffer.sampleRate;
+
+      // Determine the target sample rate based on half-speed mode
+      const outSampleRate = isHalfSpeed ? 5734 : 11468;
+
+      // Resample the audio data to match the target sample rate
+      const resampledData = resampleAudio(sampleData, inSampleRate, outSampleRate);
+
+      // Convert Int16Array to regular array for serialization
+      const serializableSampleData = Array.from(resampledData);
+
+      return {
+        sampleData: serializableSampleData,
+        sampleName: 'REC',
+      };
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to add recorded sample');
+    }
+  }
+);
+
+// Define return type for saveTempSampleToKit thunk
+interface SaveTempSampleToKitResult {
+  selectedSampleIndex: number;
+}
+
+// Create an async thunk for saving the temporary sample to the kit
+export const saveTempSampleToKit = createAsyncThunk<SaveTempSampleToKitResult, void>(
+  'kit/saveTempSampleToKit',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState;
+      const { samples, tempRecordedSample } = state.kit;
+
+      if (!tempRecordedSample) {
+        return rejectWithValue('No temporary sample to save');
+      }
+
+      // Find the first free sample slot
+      const firstFreeSlot = samples.findIndex((sample: Sample | null) => sample === null);
+      if (firstFreeSlot === -1) {
+        return rejectWithValue('Kit is full');
+      }
+
+      return {
+        selectedSampleIndex: firstFreeSlot,
+      };
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to save sample to kit');
+    }
+  }
+);
+
 // Create an async thunk for adding a sample
 export const addSample = createAsyncThunk<AddSampleResult, void>(
   'kit/addSample',
@@ -347,6 +502,15 @@ const kitSlice = createSlice({
   name: 'kit',
   initialState,
   reducers: {
+    clearTempRecordedSample: (state) => {
+      state.tempRecordedSample = null;
+    },
+    updateTempRecordedSample: (state, action: PayloadAction<SerializableSample>) => {
+      if (state.tempRecordedSample) {
+        // Update the state with the serializable sample
+        state.tempRecordedSample = action.payload;
+      }
+    },
     selectSample: (state, action: PayloadAction<number | null>) => {
       state.selectedSampleIndex = action.payload;
     },
@@ -643,12 +807,86 @@ const kitSlice = createSlice({
       })
       .addCase(playSample.rejected, (state, action) => {
         state.error = action.payload as string || 'An unknown error occurred';
+      })
+      // Handle addRecordedSample
+      .addCase(addRecordedSample.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(addRecordedSample.fulfilled, (state, action) => {
+        state.isLoading = false;
+
+        // Create a serializable representation of the sample
+        state.tempRecordedSample = {
+          name: action.payload.sampleName,
+          sampleData: action.payload.sampleData,
+          untrimmedLength: action.payload.sampleData.length,
+          readPos: 0,
+          volumeDb: 0,
+          pitchSemitones: 0,
+          trim: 0,
+          dither: false,
+          halfSpeed: state.isHalfSpeed
+        };
+      })
+      .addCase(addRecordedSample.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string || 'An unknown error occurred';
+      })
+
+      // Handle saveTempSampleToKit
+      .addCase(saveTempSampleToKit.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(saveTempSampleToKit.fulfilled, (state, action) => {
+        state.isLoading = false;
+
+        if (!state.tempRecordedSample) {
+          state.error = 'No temporary sample to save';
+          return;
+        }
+
+        // Convert the serializable sample to a Sample object
+        const sample = serializableToSample(state.tempRecordedSample);
+
+        // Create a copy of the samples array
+        const newSamples = [...state.samples];
+        newSamples[action.payload.selectedSampleIndex] = sample;
+
+        // Calculate bytes free
+        const { bytesFree } = calculateSampleSizeAndBytesFree(newSamples);
+
+        // If the sample doesn't fit, trim it
+        if (bytesFree < 0) {
+          const trim = Math.ceil(-bytesFree / 16);
+          sample.setTrim(trim);
+          sample.processSamples();
+        }
+
+        // Update state
+        state.samples = newSamples;
+        state.selectedSampleIndex = action.payload.selectedSampleIndex;
+        state.tempRecordedSample = null; // Clear the temporary sample
+
+        // Update total sample size and bytes free
+        if (state.kitInfo) {
+          const { totalSampleSizeInBytes, bytesFree } = calculateSampleSizeAndBytesFree(newSamples);
+          state.kitInfo.totalSampleSizeInBytes = totalSampleSizeInBytes;
+          state.kitInfo.bytesFree = bytesFree;
+        }
+      })
+      .addCase(saveTempSampleToKit.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string || 'An unknown error occurred';
       });
   },
 });
 
 // Export actions and reducer
 export const {
+  clearTempRecordedSample,
+  updateTempRecordedSample,
   selectSample,
   selectBank,
   setHalfSpeed,
@@ -667,6 +905,9 @@ export const {
   fadeOutFrames,
   revertSample,
 } = kitSlice.actions;
+
+// Export helper functions
+export { serializableToSample, sampleToSerializable };
 
 // Define a type for the window object with our custom property
 interface CustomWindow extends Window {
@@ -689,7 +930,10 @@ const isKitModifyingAction = (action: unknown): action is { type: string } => {
     'kit/fadeInFrames',
     'kit/fadeOutFrames',
     'kit/revertSample',
+    'kit/clearTempRecordedSample',
     'kit/addSample/fulfilled',
+    'kit/addRecordedSample/fulfilled',
+    'kit/saveTempSampleToKit/fulfilled',
     'kit/loadKitFromFile/fulfilled',
     'kit/loadKitFromRomBank/fulfilled',
   ];

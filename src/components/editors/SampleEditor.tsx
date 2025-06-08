@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useAppDispatch } from '../../store';
+import { useAppDispatch, useAppSelector } from '../../store';
 import { 
   playSample, 
   updateSampleVolume, 
@@ -13,14 +13,19 @@ import {
   fadeInFrames,
   fadeOutFrames,
   selectSample,
-  revertSample
+  revertSample,
+  saveTempSampleToKit,
+  clearTempRecordedSample,
+  updateTempRecordedSample
 } from '../../store';
+import { serializableToSample, sampleToSerializable } from '../../store/slices/kitSlice';
 import { SampleWaveform } from './SampleWaveform';
-import { Sample } from '../../services/audio';
+import { Sample, AudioService } from '../../services/audio';
 import { SampleControls } from './sample-editor/SampleControls';
 import { SampleHeader } from './sample-editor/SampleHeader';
 import { SampleActions } from './sample-editor/SampleActions';
 import { SampleSelectionTools } from './sample-editor/SampleSelectionTools';
+import { SampleRecorder } from './sample-editor/SampleRecorder';
 import { convertSampleDataForWaveform, calculateSampleDuration, sanitizeLSDJInput } from '../../utils/sample-utils';
 import './SampleEditor.css';
 
@@ -38,6 +43,7 @@ export function SampleEditor({
   isLoading 
 }: SampleEditorProps) {
   const dispatch = useAppDispatch();
+  const { tempRecordedSample, kitInfo } = useAppSelector(state => state.kit);
 
   // Local state for editable fields
   const [volumeDb, setVolumeDb] = useState(0);
@@ -344,8 +350,226 @@ export function SampleEditor({
     }
   }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
 
-  if (selectedSampleIndex === null || !samples[selectedSampleIndex]) {
+  // Convert the serializable sample to a Sample object if it exists
+  const tempSample = tempRecordedSample ? serializableToSample(tempRecordedSample) : null;
+
+  // Create a temporary sample array with just the recorded sample if it exists
+  const tempSamples = tempSample ? [tempSample] : [];
+
+  // Create handlers for the temporary sample
+  const handleSaveToKit = useCallback(() => {
+    dispatch(saveTempSampleToKit());
+  }, [dispatch]);
+
+  const handleDiscard = useCallback(() => {
+    dispatch(clearTempRecordedSample());
+  }, [dispatch]);
+
+  // Handler for previewing the temporary sample
+  const handlePreviewSample = useCallback(async () => {
+    if (!tempSample) return;
+
+    try {
+      // Stop any currently playing audio
+      AudioService.stopAll();
+
+      // Get the sample data
+      const sampleData = tempSample.workSampleData();
+
+      // Convert the Int16Array to an ArrayBuffer
+      const buffer = new ArrayBuffer(sampleData.length * 2);
+      const view = new DataView(buffer);
+      for (let i = 0; i < sampleData.length; i++) {
+        view.setInt16(i * 2, sampleData[i], true);
+      }
+
+      // Determine the sample rate based on half-speed mode
+      const sampleRate = isHalfSpeed ? 5734 : 11468;
+
+      // Play the sample
+      await AudioService.playAudioBuffer(buffer, {}, sampleRate);
+    } catch (error) {
+      console.error('Error playing sample:', error);
+    }
+  }, [tempSample, isHalfSpeed]);
+
+  // Calculate if the sample will fit in the kit
+  const tempSampleSize = tempSample ? tempSample.lengthInBytes() : 0;
+  const isSampleTooLarge = kitInfo && tempSample ? tempSampleSize > kitInfo.bytesFree : false;
+
+  // If there's a temporary recorded sample, show the temp sample editor
+  if (tempRecordedSample && tempSample) {
+
+    return (
+      <div className="sample-editor" role="region" aria-label="Sample editor">
+        <div className="sample-editor-header">
+          <h3>Edit Recorded Sample</h3>
+          <p className="sample-editor-instructions">
+            Edit your recording to fit the kit requirements, then save it to the kit.
+          </p>
+        </div>
+
+        <SampleHeader
+          sampleName={tempSample.getName()}
+          isLoading={isLoading}
+          onUpdateName={(name) => {
+            tempSample.setName(name);
+            // Convert to serializable format and update in the Redux store
+            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+          }}
+        />
+
+        <SampleControls
+          sample={tempSample}
+          volumeDb={tempSample.getVolumeDb()}
+          pitchSemitones={tempSample.getPitchSemitones()}
+          trim={tempSample.getTrim()}
+          dither={tempSample.getDither()}
+          maxTrim={Math.max(0, Math.floor(tempSample.untrimmedLengthInSamples() / 32) - 1)}
+          isLoading={isLoading}
+          onUpdateVolume={(value) => {
+            tempSample.setVolumeDb(value);
+            tempSample.processSamples();
+            // Convert to serializable format and update in the Redux store
+            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+          }}
+          onUpdatePitch={(value) => {
+            tempSample.setPitchSemitones(value);
+            tempSample.applyPitchShift(isHalfSpeed);
+            // Convert to serializable format and update in the Redux store
+            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+          }}
+          onUpdateTrim={(value) => {
+            tempSample.setTrim(value);
+            tempSample.processSamples();
+            // Convert to serializable format and update in the Redux store
+            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+          }}
+          onUpdateDither={(value) => {
+            tempSample.setDither(value);
+            tempSample.processSamples();
+            // Convert to serializable format and update in the Redux store
+            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+          }}
+        />
+
+        <div className="sample-waveform-selection">
+          <SampleWaveform
+            data={convertSampleDataForWaveform(tempSample.workSampleData())}
+            duration={calculateSampleDuration(tempSample.lengthInSamples(), isHalfSpeed)}
+            height={128}
+            onSelection={setSelection}
+            selection={selection}
+          />
+
+          <SampleSelectionTools
+            selection={selection}
+            onDeleteFrames={() => {
+              if (selection) {
+                tempSample.deleteFrames(
+                  Math.min(selection.startFrame, selection.endFrame),
+                  Math.max(selection.startFrame, selection.endFrame)
+                );
+                setSelection(null);
+                // Convert to serializable format and update in the Redux store
+                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+              }
+            }}
+            onCropFrames={() => {
+              if (selection) {
+                tempSample.cropFrames(
+                  Math.min(selection.startFrame, selection.endFrame),
+                  Math.max(selection.startFrame, selection.endFrame)
+                );
+                setSelection(null);
+                // Convert to serializable format and update in the Redux store
+                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+              }
+            }}
+            onFadeInFrames={() => {
+              if (selection) {
+                tempSample.fadeInFrames(
+                  Math.min(selection.startFrame, selection.endFrame),
+                  Math.max(selection.startFrame, selection.endFrame)
+                );
+                setSelection(null);
+                // Convert to serializable format and update in the Redux store
+                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+              }
+            }}
+            onFadeOutFrames={() => {
+              if (selection) {
+                tempSample.fadeOutFrames(
+                  Math.min(selection.startFrame, selection.endFrame),
+                  Math.max(selection.startFrame, selection.endFrame)
+                );
+                setSelection(null);
+                // Convert to serializable format and update in the Redux store
+                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+              }
+            }}
+          />
+        </div>
+
+        <div className="sample-editor-actions">
+          <div className="temp-sample-actions">
+            <button
+              onClick={handleDiscard}
+              className="discard-button"
+              disabled={isLoading}
+              aria-label="Discard recorded sample"
+            >
+              Discard
+            </button>
+            <button
+              onClick={handlePreviewSample}
+              className="preview-button"
+              disabled={isLoading}
+              aria-label="Preview recorded sample"
+            >
+              Preview
+            </button>
+            <button
+              onClick={handleSaveToKit}
+              className="save-button"
+              disabled={isLoading || isSampleTooLarge}
+              aria-label="Save sample to kit"
+              title={isSampleTooLarge ? "Sample is too large for the available space in the kit" : "Save this sample to the kit"}
+            >
+              Save to Kit
+            </button>
+          </div>
+          {kitInfo && (
+            <div className="sample-size-info">
+              <p>
+                {tempSampleSize}/{kitInfo.bytesFree} bytes
+                {isSampleTooLarge && (
+                  <span className="sample-size-warning">
+                    {" "}(need to trim {tempSampleSize - kitInfo.bytesFree} bytes)
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // If no sample index is selected at all, don't render anything
+  if (selectedSampleIndex === null) {
     return null;
+  }
+
+  // If an empty slot is selected, only show the recorder
+  if (!samples[selectedSampleIndex]) {
+    return (
+      <div className="sample-editor" role="region" aria-label="Sample editor">
+        <div className="sample-editor-empty">
+          <SampleRecorder isLoading={isLoading} />
+        </div>
+      </div>
+    );
   }
 
   const sample = samples[selectedSampleIndex];
@@ -390,13 +614,18 @@ export function SampleEditor({
         />
       </div>
 
-      <SampleActions
-        sampleIndex={selectedSampleIndex}
-        isLoading={isLoading}
-        onRemoveSample={handleRemoveSample}
-        onPlaySample={handlePlaySample}
-        onRevertSample={handleRevertSample}
-      />
+      <div className="sample-editor-actions">
+        <SampleRecorder
+          isLoading={isLoading}
+        />
+        <SampleActions
+          sampleIndex={selectedSampleIndex}
+          isLoading={isLoading}
+          onRemoveSample={handleRemoveSample}
+          onPlaySample={handlePlaySample}
+          onRevertSample={handleRevertSample}
+        />
+      </div>
     </div>
   );
 }
