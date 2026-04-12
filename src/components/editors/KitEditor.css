@@ -14,11 +14,27 @@
   color: var(--gb-dark);
 }
 
+/* Toolbar with grouped buttons */
 .controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.control-group-file,
+.control-group-kit {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-danger {
+  opacity: 0.8;
+}
+
+.btn-danger:hover {
+  opacity: 1;
 }
 
 .error-message {
@@ -30,11 +46,12 @@
   font-size: 0.8rem;
 }
 
+/* Bank selector header */
 .bank-kit-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .preferences-icon {
@@ -62,6 +79,10 @@
   color: var(--gb-darkest);
 }
 
+.preferences-icon:hover .preferences-svg-icon path {
+  fill: var(--gb-darkest);
+}
+
 .preferences-icon:active {
   transform: translateY(2px);
   box-shadow: 0px 0px 0 var(--gb-darkest);
@@ -78,51 +99,83 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--gb-light);
-  border-radius: 4px;
+  padding: 0.75rem;
+  border: 2px solid var(--gb-light);
   background-color: var(--gb-darkest);
 }
 
+/* ── Sample Pad Grid ── */
 .sample-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 0.5rem;
 }
 
 .sample-pad {
-  width: 60px;
-  height: 60px;
+  aspect-ratio: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  position: relative;
   background-color: var(--gb-darkest);
   color: var(--gb-lightest);
-  border: 2px solid var(--gb-light);
+  border: 3px solid var(--gb-light);
   cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.1s ease;
-  position: relative;
+  font-size: 0.7rem;
+  transition: all 0.08s ease;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  padding: 0.25rem;
+}
+
+.sample-pad .pad-index {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.5rem;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.sample-pad .pad-name {
+  font-size: 0.65rem;
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.2;
 }
 
 .sample-pad.selected {
   background-color: var(--gb-light);
   color: var(--gb-darkest);
   border-color: var(--gb-lightest);
+  box-shadow: 0 0 0 1px var(--gb-lightest), 2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.sample-pad.selected .pad-index {
+  opacity: 0.6;
 }
 
 .sample-pad.empty {
+  opacity: 0.35;
+  border-style: dashed;
+  border-width: 2px;
+}
+
+.sample-pad.empty .pad-name {
   opacity: 0.5;
-  cursor: default;
 }
 
-.sample-pad:hover:not(.empty) {
+.sample-pad:hover:not(.empty):not(:disabled) {
   background-color: var(--gb-dark);
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
 }
 
-.sample-pad:active:not(.empty) {
-  transform: scale(0.95);
+.sample-pad:active:not(.empty):not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0px 0px 0 rgba(0, 0, 0, 0.4);
 }
 
 .sample-pad .remove-button {
@@ -147,33 +200,42 @@
   background-color: var(--gb-darkest);
 }
 
+/* ── Memory Bar ── */
 .kit-info {
-  margin-top: 1rem;
-}
-
-.kit-name {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .memory-bar {
-  height: 20px;
+  height: 24px;
   background-color: var(--gb-darkest);
-  border: 1px solid var(--gb-light);
-  margin-bottom: 0.5rem;
+  border: 2px solid var(--gb-light);
+  margin-bottom: 0.25rem;
+  position: relative;
+  overflow: hidden;
 }
 
 .memory-bar-used {
   height: 100%;
   background-color: var(--gb-light);
+  transition: width 0.3s ease;
 }
 
+.memory-bar-warning .memory-bar-used {
+  background-color: var(--gb-lightest);
+}
+
+.memory-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+
+/* ── Sample Editor area ── */
 .sample-editor {
-  margin-top: 1rem;
-  border: 2px solid var(--gb-light);
-  border-radius: 4px;
-  padding: 1rem;
+  margin-top: 0.5rem;
+  border: 3px solid var(--gb-light);
+  padding: 0.75rem;
   background-color: var(--gb-darkest);
 }
 
@@ -207,15 +269,21 @@
   gap: 0.5rem;
 }
 
-/* Mobile responsiveness */
+/* ── Mobile responsiveness ── */
 @media (max-width: 768px) {
   .controls {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .controls button {
-    width: 100%;
+  .control-group-file,
+  .control-group-kit {
+    flex-direction: row;
+  }
+
+  .control-group-file button,
+  .control-group-kit button {
+    flex: 1;
   }
 
   .bank-kit-header {
@@ -230,21 +298,12 @@
   }
 
   .sample-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
   }
 
-  .sample-pad {
-    width: 100%;
-    height: 0;
-    padding-bottom: 100%; /* Makes the height equal to the width */
-    position: relative;
-  }
-
-  .sample-pad span {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+  .sample-pad .pad-name {
+    font-size: 0.55rem;
   }
 
   .sample-controls {

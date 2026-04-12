@@ -15,24 +15,17 @@ export function SampleHeader({
   onUpdateName
 }: SampleHeaderProps) {
   return (
-    <div className="control-group">
+    <div className="sample-header-group">
       <label htmlFor="sample-name-control">Name:</label>
       <input
         id="sample-name-control"
         type="text"
+        className="sample-name-input"
         value={sampleName}
         onChange={(e) => onUpdateName(e.target.value)}
         maxLength={3}
         disabled={isLoading}
         aria-label="Sample name"
-        style={{ 
-          textTransform: 'uppercase', 
-          width: '60px',
-          height: '60px',
-          marginLeft: '8px',
-          padding: '4px 8px',
-          border: '1px solid #ccc',
-        }}
       />
     </div>
   );

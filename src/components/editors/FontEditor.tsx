@@ -29,22 +29,17 @@ export function FontEditor() {
   const [fontNames, setFontNames] = useState<string[]>([]);
 
   // Load font data from the processor
-  const loadFontData = useCallback((processor: FontProcessor) => {
+  const loadFontData = useCallback((processor: FontProcessor, includeGfx: boolean = showGfxCharacters) => {
     if (!processor) return;
 
-    // Calculate the number of tiles to load
-    const tileCount = showGfxCharacters
+    const tileCount = includeGfx
       ? FONT_CONSTANTS.TILE_COUNT + FONT_CONSTANTS.GFX_TILE_COUNT
       : FONT_CONSTANTS.TILE_COUNT;
 
-    // Create a 3D array to hold the font data
     const data: number[][][] = [];
 
-    // Load each tile
     for (let tile = 0; tile < tileCount; tile++) {
       const tileData: number[][] = [];
-
-      // Load each pixel in the tile
       for (let y = 0; y < 8; y++) {
         const row: number[] = [];
         for (let x = 0; x < 8; x++) {
@@ -52,7 +47,6 @@ export function FontEditor() {
         }
         tileData.push(row);
       }
-
       data.push(tileData);
     }
 
@@ -207,36 +201,7 @@ export function FontEditor() {
 
     // Reload the font data to include/exclude graphics characters
     if (fontProcessor) {
-      // Create a modified version of loadFontData that uses the new showGfxCharacters value
-      const loadFontDataWithNewSetting = (processor: FontProcessor) => {
-        // Calculate the number of tiles to load using the new setting
-        const tileCount = newShowGfxCharacters
-          ? FONT_CONSTANTS.TILE_COUNT + FONT_CONSTANTS.GFX_TILE_COUNT
-          : FONT_CONSTANTS.TILE_COUNT;
-
-        // Create a 3D array to hold the font data
-        const data: number[][][] = [];
-
-        // Load each tile
-        for (let tile = 0; tile < tileCount; tile++) {
-          const tileData: number[][] = [];
-
-          // Load each pixel in the tile
-          for (let y = 0; y < 8; y++) {
-            const row: number[] = [];
-            for (let x = 0; x < 8; x++) {
-              row.push(processor.getTilePixel(tile, x, y));
-            }
-            tileData.push(row);
-          }
-
-          data.push(tileData);
-        }
-
-        setFontData(data);
-      };
-
-      loadFontDataWithNewSetting(fontProcessor);
+      loadFontData(fontProcessor, newShowGfxCharacters);
     }
   };
 

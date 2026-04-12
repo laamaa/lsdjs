@@ -18,6 +18,8 @@ export interface ExportKitData {
 interface RomContextValue {
   romInfo: RomInfo | null;
   romData: ArrayBuffer | null;
+  /** Bumps only when a new ROM file is loaded (not when kit sync replaces the buffer). */
+  romLoadGeneration: number;
   isLoading: boolean;
   error: string | null;
   loadRomFile: () => Promise<void>;
@@ -35,6 +37,7 @@ interface RomProviderProps {
 export function RomProvider({ children, initialState }: RomProviderProps) {
   const [romInfo, setRomInfo] = useState<RomInfo | null>(initialState?.romInfo ?? null);
   const [romData, setRomData] = useState<ArrayBuffer | null>(initialState?.romData ?? null);
+  const [romLoadGeneration, setRomLoadGeneration] = useState(0);
   const { isLoading, error, setError, withLoading } = useLoadingState(
     initialState?.isLoading ?? false,
     initialState?.error ?? null
@@ -61,6 +64,7 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
 
       setRomInfo(parsedInfo);
       setRomData(fileData);
+      setRomLoadGeneration((g) => g + 1);
     }),
 
     exportRomFile: (kitData: ExportKitData) => withLoading('Failed to export ROM file', async () => {
@@ -90,8 +94,8 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
   }), [withLoading]);
 
   const value = useMemo<RomContextValue>(
-    () => ({ romInfo, romData, isLoading, error, ...actions }),
-    [romInfo, romData, isLoading, error, actions]
+    () => ({ romInfo, romData, romLoadGeneration, isLoading, error, ...actions }),
+    [romInfo, romData, romLoadGeneration, isLoading, error, actions]
   );
 
   return (

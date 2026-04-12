@@ -3,6 +3,7 @@ import { useRom } from '../../context/RomContext';
 import { useKit } from '../../context/KitContext';
 import { SampleEditor } from './SampleEditor';
 import { BankNameSelector } from '../common/BankNameSelector';
+import { CustomCheckbox } from '../common';
 import { SerializedSample } from '../../utils/sample-serialization';
 import './KitEditor.css';
 
@@ -82,18 +83,20 @@ export function KitEditor() {
       <div className="sample-grid" role="grid" aria-label="Sample grid">
         {Array.from({ length: 15 }).map((_, index) => {
           const sample = samples[index];
+          const isEmpty = !sample;
           const name = sample ? sample.name : '-';
 
           return (
             <button
               key={index}
-              className={`sample-pad ${selectedSampleIndex === index ? 'selected' : ''}`}
+              className={`sample-pad ${selectedSampleIndex === index ? 'selected' : ''} ${isEmpty ? 'empty' : ''}`}
               onClick={() => handleSelectSample(index)}
               disabled={isLoading}
               aria-selected={selectedSampleIndex === index}
               aria-label={`Sample ${index + 1}: ${name}`}
             >
-              {name}
+              <span className="pad-index">{index.toString(16).toUpperCase()}</span>
+              <span className="pad-name">{name}</span>
             </button>
           );
         })}
@@ -115,7 +118,7 @@ export function KitEditor() {
       <div className="kit-info" role="region" aria-label="Kit information">
         <div className="kit-size">
           <div
-            className="memory-bar"
+            className={`memory-bar ${usedPercentage > 90 ? 'memory-bar-warning' : ''}`}
             role="progressbar"
             aria-valuenow={usedPercentage}
             aria-valuemin={0}
@@ -128,7 +131,8 @@ export function KitEditor() {
             />
           </div>
           <div className="memory-stats">
-            <span>{timeFree.toFixed(3)} seconds free</span>
+            <span>{timeFree.toFixed(3)}s free</span>
+            <span>{usedPercentage}% — {(totalSampleSizeInBytes / 1024).toFixed(1)}KB / {(totalSpace / 1024).toFixed(1)}KB</span>
           </div>
         </div>
       </div>
@@ -147,32 +151,37 @@ export function KitEditor() {
     <div className="kit-editor" role="region" aria-label="Kit Editor">
 
       <div className="controls" role="toolbar" aria-label="Kit editor controls">
-        <button
-          onClick={handleLoadKitFromFile}
-          disabled={!romData || isLoading || !Array.isArray(romInfo?.kitBanks) || romInfo?.kitBanks.length === 0}
-          aria-busy={isLoading}
-        >
-          {isLoading ? 'Loading...' : 'Load'}
-        </button>
-        <button
-          onClick={handleSaveKitToFile}
-          disabled={!kitInfo || isLoading}
-          aria-busy={isLoading}
-        >
-          {isLoading ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          onClick={handleClearKit}
-          disabled={!kitInfo || isLoading}
-        >
-          Clear
-        </button>
-        <button
-          onClick={handleAddSample}
-          disabled={!kitInfo || isLoading || samples.every((s: SerializedSample | null) => s !== null)}
-        >
-          Add Sample
-        </button>
+        <div className="control-group-file">
+          <button
+            onClick={handleLoadKitFromFile}
+            disabled={!romData || isLoading || !Array.isArray(romInfo?.kitBanks) || romInfo?.kitBanks.length === 0}
+            aria-busy={isLoading}
+          >
+            {isLoading ? 'Loading...' : 'Load Kit'}
+          </button>
+          <button
+            onClick={handleSaveKitToFile}
+            disabled={!kitInfo || isLoading}
+            aria-busy={isLoading}
+          >
+            {isLoading ? 'Saving...' : 'Save Kit'}
+          </button>
+        </div>
+        <div className="control-group-kit">
+          <button
+            onClick={handleAddSample}
+            disabled={!kitInfo || isLoading || samples.every((s: SerializedSample | null) => s !== null)}
+          >
+            Add Sample
+          </button>
+          <button
+            className="btn-danger"
+            onClick={handleClearKit}
+            disabled={!kitInfo || isLoading}
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -222,24 +231,20 @@ export function KitEditor() {
           {showPreferences && (
             <div className="preferences-container" role="group" aria-label="Preferences">
               <div id="preferences-panel" className="preferences-panel">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={isHalfSpeed}
-                    onChange={handleToggleHalfSpeed}
-                    disabled={isLoading}
-                  />
-                  Half-speed
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={useGbaPolarity}
-                    onChange={handleToggleGbaPolarity}
-                    disabled={isLoading}
-                  />
-                  Invert Polarity for GBA
-                </label>
+                <CustomCheckbox
+                  id="half-speed"
+                  label="Half-speed"
+                  checked={isHalfSpeed}
+                  onChange={handleToggleHalfSpeed}
+                  disabled={isLoading}
+                />
+                <CustomCheckbox
+                  id="gba-polarity"
+                  label="Invert Polarity for GBA"
+                  checked={useGbaPolarity}
+                  onChange={handleToggleGbaPolarity}
+                  disabled={isLoading}
+                />
               </div>
             </div>
           )}

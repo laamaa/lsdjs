@@ -13,22 +13,20 @@ import { serializedToSample } from '../utils/sample-serialization';
  * Renders nothing — purely a side-effect component.
  */
 export function RomKitSync() {
-  const { romData, romInfo, updateRomData } = useRom();
+  const { romData, romInfo, romLoadGeneration, updateRomData } = useRom();
   const { kitInfo, samples, useGbaPolarity, loadKitFromRomBank } = useKit();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const prevRomDataRef = useRef<ArrayBuffer | null>(null);
   // Read romData via ref in the sync effect to avoid romData → updateRomData → romData loop
   const romDataRef = useRef(romData);
   romDataRef.current = romData;
 
-  // Auto-load first kit when ROM loads (replaces setTimeout hack in romSlice)
+  // Auto-load first kit only when the user loads a new ROM file. Kit sync calls
+  // updateRomData with a fresh ArrayBuffer, which must not reset the selected bank.
   useEffect(() => {
-    // Only trigger when romData actually changes (new ROM loaded)
-    if (romData && romData !== prevRomDataRef.current && romInfo?.kitBanks?.length) {
-      loadKitFromRomBank(romData, romInfo.kitBanks[0]);
-    }
-    prevRomDataRef.current = romData;
-  }, [romData, romInfo, loadKitFromRomBank]);
+    if (romLoadGeneration === 0 || !romData || !romInfo?.kitBanks?.length) return;
+    loadKitFromRomBank(romData, romInfo.kitBanks[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed to file load, not buffer replacement from sync
+  }, [romLoadGeneration, loadKitFromRomBank]);
 
   // Debounced ROM sync (replaces kitMiddleware + window.__kitUpdateTimeout)
   useEffect(() => {

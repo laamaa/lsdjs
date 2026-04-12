@@ -96,7 +96,7 @@ describe('KitEditor', () => {
     });
 
     expect(screen.getByLabelText(/kit name/i)).toHaveValue('TESTKIT');
-    expect(screen.getByText(/seconds free/i)).toBeInTheDocument();
+    expect(screen.getByText(/s free/i)).toBeInTheDocument();
     expect(screen.getByRole('grid', { name: /sample grid/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sample 1: tst/i })).toBeInTheDocument();
   });

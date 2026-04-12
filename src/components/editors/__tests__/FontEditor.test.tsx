@@ -38,10 +38,10 @@ vi.mock('../../../components/common/DropdownSelector', () => ({
   ),
 }));
 
-// Mock the FontProcessor class
+// Mock the FontProcessor class (must be a non-arrow function so `new FontProcessor()` works)
 vi.mock('../../../services/binary/FontProcessor', () => {
-  return {
-    FontProcessor: vi.fn().mockImplementation(() => ({
+  function createInstance() {
+    return {
       getTilePixel: vi.fn().mockReturnValue(0),
       setTilePixel: vi.fn(),
       generateShadedAndInvertedTiles: vi.fn(),
@@ -49,7 +49,12 @@ vi.mock('../../../services/binary/FontProcessor', () => {
       rotateTileDown: vi.fn(),
       rotateTileLeft: vi.fn(),
       rotateTileRight: vi.fn(),
-    })),
+    };
+  }
+  return {
+    FontProcessor: vi.fn(function FontProcessor() {
+      return createInstance();
+    }),
   };
 });
 
@@ -148,15 +153,17 @@ describe('FontEditor', () => {
     const rotateTileRight = vi.fn();
 
     // Mock the FontProcessor class before rendering
-    (FontProcessor as unknown as vi.Mock).mockImplementation(() => ({
-      getTilePixel: vi.fn().mockReturnValue(0),
-      setTilePixel: vi.fn(),
-      generateShadedAndInvertedTiles: vi.fn(),
-      rotateTileUp,
-      rotateTileDown,
-      rotateTileLeft,
-      rotateTileRight,
-    }));
+    (FontProcessor as unknown as vi.Mock).mockImplementation(function FontProcessor() {
+      return {
+        getTilePixel: vi.fn().mockReturnValue(0),
+        setTilePixel: vi.fn(),
+        generateShadedAndInvertedTiles: vi.fn(),
+        rotateTileUp,
+        rotateTileDown,
+        rotateTileLeft,
+        rotateTileRight,
+      };
+    });
 
     renderFontEditor(mockRomState);
 

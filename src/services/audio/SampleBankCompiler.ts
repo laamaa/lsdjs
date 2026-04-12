@@ -6,6 +6,7 @@
  */
 
 import { Sample } from './sample';
+import { BinaryProcessor } from '../binary';
 
 const BANK_SIZE = 0x4000; // 16,384 bytes
 const KIT_MAGIC_0 = 0x60;
@@ -334,25 +335,3 @@ export const SampleBankCompiler = {
     return { samples, kitName };
   }
 };
-
-/**
- * Helper class for BinaryProcessor (used in extractFromRomBank)
- */
-class BinaryProcessor {
-  private dataView: DataView;
-
-  constructor(buffer: ArrayBuffer) {
-    this.dataView = new DataView(buffer);
-  }
-
-  public readAsciiString(offset: number, maxLength: number): string {
-    const bytes = new Uint8Array(this.dataView.buffer, offset, maxLength);
-    let endIndex = bytes.findIndex(byte => byte === 0);
-
-    if (endIndex === -1) {
-      endIndex = maxLength;
-    }
-
-    return String.fromCharCode(...bytes.slice(0, endIndex));
-  }
-}
