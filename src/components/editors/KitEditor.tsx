@@ -1,134 +1,94 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { 
-  useAppDispatch, 
-  useAppSelector, 
-  loadKitFromFile, 
-  loadKitFromRomBank,
-  saveKitToFile, 
-  addSample, 
-  selectSample, 
-  selectBank, 
-  setHalfSpeed, 
-  setGbaPolarity, 
-  renameKit, 
-  clearKit,
-  playSample
-} from '../../store';
+import { useRom } from '../../context/RomContext';
+import { useKit } from '../../context/KitContext';
 import { SampleEditor } from './SampleEditor';
 import { BankNameSelector } from '../common/BankNameSelector';
-import { Sample } from '../../services/audio';
+import { SerializedSample } from '../../utils/sample-serialization';
 import './KitEditor.css';
 
 export function KitEditor() {
-  const dispatch = useAppDispatch();
+  const { romData, romInfo } = useRom();
+  const {
+    kitInfo, samples, selectedSampleIndex, selectedBankIndex,
+    isHalfSpeed, useGbaPolarity, isLoading, error,
+    selectSample, selectBank, setHalfSpeed, setGbaPolarity,
+    renameKit, clearKit, playSample, addSample,
+    loadKitFromFile, loadKitFromRomBank, saveKitToFile,
+  } = useKit();
 
-  // Select state from Redux store
-  const romData = useAppSelector(state => state.rom.romData);
-  const romInfo = useAppSelector(state => state.rom.romInfo);
-  const kitInfo = useAppSelector(state => state.kit.kitInfo);
-  const samples = useAppSelector(state => state.kit.samples);
-  const selectedSampleIndex = useAppSelector(state => state.kit.selectedSampleIndex);
-  const selectedBankIndex = useAppSelector(state => state.kit.selectedBankIndex);
-  const isHalfSpeed = useAppSelector(state => state.kit.isHalfSpeed);
-  const useGbaPolarity = useAppSelector(state => state.kit.useGbaPolarity);
-  const isLoading = useAppSelector(state => state.kit.isLoading);
-  const error = useAppSelector(state => state.kit.error);
-
-  // Local state for editable fields
   const [kitName, setKitName] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Update local state when kit info changes
   useEffect(() => {
     if (kitInfo) {
-      // Directly update state without triggering rename action
       setKitName(kitInfo.name);
     } else {
       setKitName('');
     }
   }, [kitInfo]);
 
-
-  // Handler for loading a kit from a file
   const handleLoadKitFromFile = useCallback(() => {
-    dispatch(loadKitFromFile());
-  }, [dispatch]);
+    if (romData) loadKitFromFile(romData);
+  }, [loadKitFromFile, romData]);
 
-  // Handler for saving a kit to a file
   const handleSaveKitToFile = useCallback(() => {
-    dispatch(saveKitToFile());
-  }, [dispatch]);
+    if (romData) saveKitToFile(romData);
+  }, [saveKitToFile, romData]);
 
-  // Handler for adding a sample
   const handleAddSample = useCallback(() => {
-    dispatch(addSample());
-  }, [dispatch]);
+    addSample();
+  }, [addSample]);
 
-  // Handler for selecting a sample
   const handleSelectSample = useCallback((index: number | null) => {
-    dispatch(selectSample(index));
-
-    // Play the sample when it's selected
+    selectSample(index);
     if (index !== null) {
-      dispatch(playSample(index));
+      playSample(index);
     }
-  }, [dispatch]);
+  }, [selectSample, playSample]);
 
-  // Handler for selecting a bank
   const handleSelectBank = useCallback((index: number) => {
-    dispatch(selectBank(index));
-
-    // Load the kit from the selected bank if ROM data is available
+    selectBank(index);
     if (romData) {
-      dispatch(loadKitFromRomBank({ romData, bankIndex: index }));
+      loadKitFromRomBank(romData, index);
     }
-  }, [dispatch, romData]);
+  }, [selectBank, loadKitFromRomBank, romData]);
 
-  // Handler for toggling half-speed mode
   const handleToggleHalfSpeed = useCallback(() => {
-    dispatch(setHalfSpeed(!isHalfSpeed));
-  }, [dispatch, isHalfSpeed]);
+    setHalfSpeed(!isHalfSpeed);
+  }, [setHalfSpeed, isHalfSpeed]);
 
-  // Handler for toggling GBA polarity
   const handleToggleGbaPolarity = useCallback(() => {
-    dispatch(setGbaPolarity(!useGbaPolarity));
-  }, [dispatch, useGbaPolarity]);
+    setGbaPolarity(!useGbaPolarity);
+  }, [setGbaPolarity, useGbaPolarity]);
 
-  // Function to sanitize input for LSDj compatibility
   const sanitizeLSDJInput = (input: string): string => {
     return input.toUpperCase().replace(/[^A-Z0-9 -]/g, '');
   };
 
-  // Handler for renaming a kit - now automatically called when input changes
   const handleRenameKit = useCallback((newName: string) => {
     const sanitizedName = sanitizeLSDJInput(newName);
     setKitName(sanitizedName);
-    dispatch(renameKit(sanitizedName));
-  }, [dispatch]);
+    renameKit(sanitizedName);
+  }, [renameKit]);
 
-  // Handler for clearing a kit
   const handleClearKit = useCallback(() => {
     if (window.confirm('Are you sure you want to clear this kit?')) {
-      dispatch(clearKit());
+      clearKit();
     }
-  }, [dispatch]);
+  }, [clearKit]);
 
-
-  // Render the sample grid
   const renderSampleGrid = () => {
     return (
       <div className="sample-grid" role="grid" aria-label="Sample grid">
         {Array.from({ length: 15 }).map((_, index) => {
           const sample = samples[index];
-          const name = sample ? sample.getName() : '-';
+          const name = sample ? sample.name : '-';
 
           return (
             <button
               key={index}
               className={`sample-pad ${selectedSampleIndex === index ? 'selected' : ''}`}
-              onClick={() => {
-                handleSelectSample(index);
-              }}
+              onClick={() => handleSelectSample(index)}
               disabled={isLoading}
               aria-selected={selectedSampleIndex === index}
               aria-label={`Sample ${index + 1}: ${name}`}
@@ -141,7 +101,6 @@ export function KitEditor() {
     );
   };
 
-  // Render the kit info
   const renderKitInfo = () => {
     if (!kitInfo) return null;
 
@@ -149,22 +108,21 @@ export function KitEditor() {
     const totalSpace = totalSampleSizeInBytes + bytesFree;
     const usedPercentage = Math.round((totalSampleSizeInBytes / totalSpace) * 100);
 
-    // Calculate time free
     const sampleRate = isHalfSpeed ? 5734 : 11468;
     const timeFree = (bytesFree * 2) / sampleRate;
 
     return (
       <div className="kit-info" role="region" aria-label="Kit information">
         <div className="kit-size">
-          <div 
-            className="memory-bar" 
-            role="progressbar" 
-            aria-valuenow={usedPercentage} 
-            aria-valuemin={0} 
+          <div
+            className="memory-bar"
+            role="progressbar"
+            aria-valuenow={usedPercentage}
+            aria-valuemin={0}
             aria-valuemax={100}
           >
-            <div 
-              className="memory-bar-used" 
+            <div
+              className="memory-bar-used"
               style={{ width: `${usedPercentage}%` }}
               title={`${totalSampleSizeInBytes} bytes used (${usedPercentage}%)`}
             />
@@ -177,8 +135,6 @@ export function KitEditor() {
     );
   };
 
-
-  // Render a message if no ROM is loaded
   if (!romData || !romInfo?.kitBanks?.length) {
     return (
       <div className="kit-editor-empty">
@@ -213,17 +169,16 @@ export function KitEditor() {
         </button>
         <button
           onClick={handleAddSample}
-          disabled={!kitInfo || isLoading || samples.every((s: Sample | null) => s !== null)}
+          disabled={!kitInfo || isLoading || samples.every((s: SerializedSample | null) => s !== null)}
         >
           Add Sample
         </button>
       </div>
 
-
       {error && (
-        <div 
+        <div
           className="error-message"
-          role="alert" 
+          role="alert"
           aria-live="assertive"
         >
           {error}
@@ -243,7 +198,7 @@ export function KitEditor() {
               disabled={isLoading}
               maxNameLength={6}
             />
-            <button 
+            <button
               className={`preferences-icon ${showPreferences ? 'active' : ''}`}
               onClick={() => setShowPreferences(!showPreferences)}
               aria-expanded={showPreferences}
@@ -291,7 +246,7 @@ export function KitEditor() {
 
           {renderKitInfo()}
           {renderSampleGrid()}
-          <SampleEditor 
+          <SampleEditor
             selectedSampleIndex={selectedSampleIndex}
             samples={samples}
             isHalfSpeed={isHalfSpeed}
@@ -302,7 +257,7 @@ export function KitEditor() {
 
       {!kitInfo && !isLoading && !error && (
         <p aria-live="polite">
-          {romData && romInfo?.kitBanks?.length === 0 
+          {romData && romInfo?.kitBanks?.length === 0
             ? "This ROM does not contain any kit banks. Please load a ROM with kit banks."
             : "Please load a ROM file with kit data to use the Kit Editor."}
         </p>

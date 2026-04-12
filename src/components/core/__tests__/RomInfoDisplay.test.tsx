@@ -1,9 +1,8 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
-import {screen, fireEvent} from '@testing-library/react';
+import {render, screen, fireEvent} from '@testing-library/react';
 import {RomInfoDisplay} from '../RomInfoDisplay';
-import {renderWithRedux} from '../../../utils/test-utils';
-import {RomProvider} from '../../../context/RomContext';
-import {RomInfo} from '../../../context/RomContext';
+import {RomProvider, RomInfo} from '../../../context/RomContext';
+import {KitProvider} from '../../../context/KitContext';
 
 describe('RomInfoDisplay', () => {
   const mockRomInfo: RomInfo = {
@@ -27,10 +26,11 @@ describe('RomInfoDisplay', () => {
       isLoading: romState?.isLoading ?? false,
       error: romState?.error ?? null,
     };
-    // Wrap in RomProvider for ROM context + renderWithRedux for kit state (still Redux)
-    return renderWithRedux(
+    return render(
       <RomProvider initialState={initialState}>
-        <RomInfoDisplay />
+        <KitProvider>
+          <RomInfoDisplay />
+        </KitProvider>
       </RomProvider>
     );
   }

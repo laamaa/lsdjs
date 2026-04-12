@@ -1,49 +1,39 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store';
-import { 
-  playSample, 
-  updateSampleVolume, 
-  updateSamplePitch, 
-  updateSampleTrim, 
-  updateSampleDither, 
-  updateSampleName,
-  removeSample,
-  deleteFrames,
-  cropFrames,
-  fadeInFrames,
-  fadeOutFrames,
-  selectSample,
-  revertSample,
-  saveTempSampleToKit,
-  clearTempRecordedSample,
-  updateTempRecordedSample
-} from '../../store';
-import { serializableToSample, sampleToSerializable } from '../../store/slices/kitSlice';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useKit } from '../../context/KitContext';
+import { SerializedSample, serializedToSample, sampleToSerialized } from '../../utils/sample-serialization';
 import { SampleWaveform } from './SampleWaveform';
-import { Sample, AudioService } from '../../services/audio';
+import { AudioService } from '../../services/audio';
 import { SampleControls } from './sample-editor/SampleControls';
 import { SampleHeader } from './sample-editor/SampleHeader';
 import { SampleActions } from './sample-editor/SampleActions';
 import { SampleSelectionTools } from './sample-editor/SampleSelectionTools';
 import { SampleRecorder } from './sample-editor/SampleRecorder';
-import { convertSampleDataForWaveform, calculateSampleDuration, sanitizeLSDJInput } from '../../utils/sample-utils';
+import { convertSampleDataForWaveform, calculateSampleDuration, sanitizeLSDJInput, int16ToArrayBuffer } from '../../utils/sample-utils';
 import './SampleEditor.css';
 
 interface SampleEditorProps {
   selectedSampleIndex: number | null;
-  samples: (Sample | null)[];
+  samples: (SerializedSample | null)[];
   isHalfSpeed: boolean;
   isLoading: boolean;
 }
 
-export function SampleEditor({ 
-  selectedSampleIndex, 
-  samples, 
-  isHalfSpeed, 
-  isLoading 
+export function SampleEditor({
+  selectedSampleIndex,
+  samples,
+  isHalfSpeed,
+  isLoading
 }: SampleEditorProps) {
-  const dispatch = useAppDispatch();
-  const { tempRecordedSample, kitInfo } = useAppSelector(state => state.kit);
+  const {
+    kitInfo, tempRecordedSample,
+    playSample: kitPlaySample,
+    updateSampleVolume, updateSamplePitch, updateSampleTrim,
+    updateSampleDither, updateSampleName, removeSample: kitRemoveSample,
+    revertSample: kitRevertSample, replaceSample,
+    deleteFrames, cropFrames, fadeInFrames, fadeOutFrames,
+    saveTempSampleToKit, clearTempRecordedSample, updateTempRecordedSample,
+    getSampleInstance,
+  } = useKit();
 
   // Local state for editable fields
   const [volumeDb, setVolumeDb] = useState(0);
@@ -60,29 +50,28 @@ export function SampleEditor({
   const currentPitchRef = React.useRef(0);
   const isUserUpdate = React.useRef(false);
 
+  // Sync local state from serialized sample
   useEffect(() => {
     if (selectedSampleIndex !== null && samples[selectedSampleIndex]) {
-      const sample = samples[selectedSampleIndex];
-      setVolumeDb(sample.getVolumeDb());
+      const s = samples[selectedSampleIndex]!;
 
-      if (!isApplyingPitchShift) {
-        setPitchSemitones(sample.getPitchSemitones());
+      // Only sync control values from context when not a user-initiated update
+      if (!isUserUpdate.current) {
+        setVolumeDb(s.volumeDb);
+        if (!isApplyingPitchShift) {
+          setPitchSemitones(s.pitchSemitones);
+        }
+        setTrim(s.trim);
+        setDither(s.dither);
+        setSampleName(s.name);
       }
 
-      setTrim(sample.getTrim());
-      setDither(sample.getDither());
-      setSampleName(sample.getName());
+      const untrimmedLength = s.untrimmedLength;
+      setMaxTrim(Math.max(0, Math.floor(untrimmedLength / 32) - 1));
 
-      const untrimmedLength = sample.untrimmedLengthInSamples();
-      const maxTrimValue = Math.max(0, Math.floor(untrimmedLength / 32) - 1);
-      setMaxTrim(maxTrimValue);
-
-      const sampleData = sample.workSampleData();
-      const packedData = convertSampleDataForWaveform(sampleData);
-      setSampleData(packedData);
-
-      const durationInSeconds = calculateSampleDuration(sample.lengthInSamples(), isHalfSpeed);
-      setSampleDuration(durationInSeconds);
+      const int16Data = new Int16Array(s.processedSamples);
+      setSampleData(convertSampleDataForWaveform(int16Data));
+      setSampleDuration(calculateSampleDuration(int16Data.length, isHalfSpeed));
     } else {
       setVolumeDb(0);
       setPitchSemitones(0);
@@ -95,62 +84,44 @@ export function SampleEditor({
     }
   }, [selectedSampleIndex, samples, isHalfSpeed, isApplyingPitchShift]);
 
-  useEffect(() => {
-    if (isUserUpdate.current) {
-      return;
-    }
-
-    if (selectedSampleIndex !== null && samples[selectedSampleIndex]) {
-      const sample = samples[selectedSampleIndex];
-
-      const sampleData = sample.workSampleData();
-      const packedData = convertSampleDataForWaveform(sampleData);
-      setSampleData(packedData);
-
-      const durationInSeconds = calculateSampleDuration(sample.lengthInSamples(), isHalfSpeed);
-      setSampleDuration(durationInSeconds);
-    }
-  }, [selectedSampleIndex, samples, isHalfSpeed]);
-
   const handlePlaySample = useCallback((index: number) => {
-    dispatch(playSample(index));
-  }, [dispatch]);
+    kitPlaySample(index);
+  }, [kitPlaySample]);
 
   const handleUpdateSampleVolume = useCallback((value: number) => {
     if (selectedSampleIndex !== null) {
       isUserUpdate.current = true;
       setVolumeDb(value);
-      dispatch(updateSampleVolume({ sampleIndex: selectedSampleIndex, volumeDb: value }));
-
-      setTimeout(() => {
-        isUserUpdate.current = false;
-      }, 50);
+      updateSampleVolume(selectedSampleIndex, value);
+      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
-  }, [dispatch, selectedSampleIndex]);
+  }, [updateSampleVolume, selectedSampleIndex]);
 
   const handleUpdateSamplePitch = useCallback(async (value: number) => {
     if (selectedSampleIndex !== null) {
       isUserUpdate.current = true;
       setPitchSemitones(value);
       currentPitchRef.current = value;
-      dispatch(updateSamplePitch({ sampleIndex: selectedSampleIndex, pitchSemitones: value }));
+      updateSamplePitch(selectedSampleIndex, value);
       setIsApplyingPitchShift(true);
 
-      const sample = samples[selectedSampleIndex];
-      if (sample) {
+      const instance = getSampleInstance(selectedSampleIndex);
+      if (instance) {
         try {
-          if (sample.getFile()) {
-            sample.setPitchSemitones(0);
-            await sample.reload(isHalfSpeed);
-            sample.setPitchSemitones(value);
-            await sample.reload(isHalfSpeed);
+          if (instance.getFile()) {
+            instance.setPitchSemitones(0);
+            await instance.reload(isHalfSpeed);
+            instance.setPitchSemitones(value);
+            await instance.reload(isHalfSpeed);
           } else {
-            sample.setPitchSemitones(value);
-            sample.applyPitchShift(isHalfSpeed);
+            instance.setPitchSemitones(value);
+            instance.applyPitchShift(isHalfSpeed);
           }
 
+          // Write back the pitch-shifted sample to context state
+          replaceSample(selectedSampleIndex, sampleToSerialized(instance));
+
           setPitchSemitones(currentPitchRef.current);
-          dispatch(selectSample(selectedSampleIndex));
 
           setTimeout(() => {
             setIsApplyingPitchShift(false);
@@ -163,242 +134,134 @@ export function SampleEditor({
         }
       }
     }
-  }, [dispatch, selectedSampleIndex, samples, isHalfSpeed, setIsApplyingPitchShift]);
+  }, [updateSamplePitch, replaceSample, getSampleInstance, selectedSampleIndex, isHalfSpeed]);
 
   const handleUpdateSampleTrim = useCallback((value: number) => {
     if (selectedSampleIndex !== null) {
       isUserUpdate.current = true;
       setTrim(value);
-      dispatch(updateSampleTrim({ sampleIndex: selectedSampleIndex, trim: value }));
-
-      setTimeout(() => {
-        isUserUpdate.current = false;
-      }, 50);
+      updateSampleTrim(selectedSampleIndex, value);
+      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
-  }, [dispatch, selectedSampleIndex]);
+  }, [updateSampleTrim, selectedSampleIndex]);
 
   const handleUpdateSampleDither = useCallback((value: boolean) => {
     if (selectedSampleIndex !== null) {
       isUserUpdate.current = true;
       setDither(value);
-      dispatch(updateSampleDither({ sampleIndex: selectedSampleIndex, dither: value }));
-
-      setTimeout(() => {
-        isUserUpdate.current = false;
-      }, 50);
+      updateSampleDither(selectedSampleIndex, value);
+      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
-  }, [dispatch, selectedSampleIndex]);
+  }, [updateSampleDither, selectedSampleIndex]);
 
   const handleUpdateSampleName = useCallback((value: string) => {
     if (selectedSampleIndex !== null) {
       isUserUpdate.current = true;
-
-      // Sanitize input for LSDj compatibility and limit to 3 characters
       const sanitizedName = sanitizeLSDJInput(value).substring(0, 3);
-
       setSampleName(sanitizedName);
-      dispatch(updateSampleName({ sampleIndex: selectedSampleIndex, name: sanitizedName }));
-
-      setTimeout(() => {
-        isUserUpdate.current = false;
-      }, 50);
+      updateSampleName(selectedSampleIndex, sanitizedName);
+      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
-  }, [dispatch, selectedSampleIndex]);
+  }, [updateSampleName, selectedSampleIndex]);
 
-  // Handler for removing a sample
   const handleRemoveSample = useCallback((index: number) => {
     if (window.confirm(`Are you sure you want to remove sample ${index}?`)) {
-      dispatch(removeSample(index));
+      kitRemoveSample(index);
     }
-  }, [dispatch]);
+  }, [kitRemoveSample]);
 
-  // Handler for reverting a sample to its original state
-  const handleRevertSample = useCallback(async (index: number) => {
+  const handleRevertSample = useCallback((index: number) => {
     if (window.confirm(`Are you sure you want to revert all edits for sample ${index}?`)) {
-      dispatch(revertSample(index));
-
-      // If the sample has a file, we need to reload it
-      const sample = samples[index];
-      if (sample && sample.getFile()) {
-        await sample.reload(isHalfSpeed);
-        dispatch(selectSample(index));
-      }
+      kitRevertSample(index);
     }
-  }, [dispatch, samples, isHalfSpeed]);
+  }, [kitRevertSample]);
 
-  const handleDeleteFrames = useCallback(async () => {
+  // Frame operations helper
+  const handleFrameOp = useCallback((
+    op: 'deleteFrames' | 'cropFrames' | 'fadeInFrames' | 'fadeOutFrames',
+    confirmMsg: string
+  ) => {
     if (selectedSampleIndex !== null && selection) {
-      if (window.confirm(`Are you sure you want to delete frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
-        const sample = samples[selectedSampleIndex];
-        if (sample) {
-          const originalSamples = sample.workSampleData();
-
-          const startFrame = Math.min(selection.startFrame, originalSamples.length - 1);
-          const endFrame = Math.min(selection.endFrame, originalSamples.length - 1);
-
+      if (window.confirm(confirmMsg)) {
+        const s = samples[selectedSampleIndex];
+        if (s) {
+          const len = s.processedSamples.length;
+          const startFrame = Math.min(selection.startFrame, len - 1);
+          const endFrame = Math.min(selection.endFrame, len - 1);
           const minFrame = Math.min(startFrame, endFrame);
           const maxFrame = Math.max(startFrame, endFrame);
 
-          dispatch(deleteFrames({
-            sampleIndex: selectedSampleIndex,
-            startFrame: minFrame,
-            endFrame: maxFrame
-          }));
-
-          const updatedSample = samples[selectedSampleIndex];
-          if (updatedSample && updatedSample.getFile()) {
-            await updatedSample.reload(isHalfSpeed);
-            dispatch(selectSample(selectedSampleIndex));
-          }
-
-          setSelection(null); // Clear selection after deleting
+          const ops = { deleteFrames, cropFrames, fadeInFrames, fadeOutFrames };
+          ops[op](selectedSampleIndex, minFrame, maxFrame);
+          setSelection(null);
         }
       }
     }
-  }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
+  }, [deleteFrames, cropFrames, fadeInFrames, fadeOutFrames, selectedSampleIndex, selection, samples]);
 
-  const handleCropFrames = useCallback(async () => {
-    if (selectedSampleIndex !== null && selection) {
-      if (window.confirm(`Are you sure you want to crop to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
-        const sample = samples[selectedSampleIndex];
-        if (sample) {
-          const originalSamples = sample.workSampleData();
+  const handleDeleteFrames = useCallback(() => {
+    if (!selection) return;
+    handleFrameOp('deleteFrames',
+      `Are you sure you want to delete frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
+  }, [handleFrameOp, selection]);
 
-          const startFrame = Math.min(selection.startFrame, originalSamples.length - 1);
-          const endFrame = Math.min(selection.endFrame, originalSamples.length - 1);
+  const handleCropFrames = useCallback(() => {
+    if (!selection) return;
+    handleFrameOp('cropFrames',
+      `Are you sure you want to crop to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
+  }, [handleFrameOp, selection]);
 
-          const minFrame = Math.min(startFrame, endFrame);
-          const maxFrame = Math.max(startFrame, endFrame);
+  const handleFadeInFrames = useCallback(() => {
+    if (!selection) return;
+    handleFrameOp('fadeInFrames',
+      `Are you sure you want to apply fade in to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
+  }, [handleFrameOp, selection]);
 
-          dispatch(cropFrames({
-            sampleIndex: selectedSampleIndex,
-            startFrame: minFrame,
-            endFrame: maxFrame
-          }));
+  const handleFadeOutFrames = useCallback(() => {
+    if (!selection) return;
+    handleFrameOp('fadeOutFrames',
+      `Are you sure you want to apply fade out to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
+  }, [handleFrameOp, selection]);
 
-          const updatedSample = samples[selectedSampleIndex];
-          if (updatedSample && updatedSample.getFile()) {
-            await updatedSample.reload(isHalfSpeed);
-            dispatch(selectSample(selectedSampleIndex));
-          }
+  // Memoize Sample instances to avoid reconstructing on every render
+  const tempSample = useMemo(
+    () => tempRecordedSample ? serializedToSample(tempRecordedSample) : null,
+    [tempRecordedSample]
+  );
 
-          setSelection(null); // Clear selection after cropping
-        }
-      }
-    }
-  }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
+  const sampleInstance = useMemo(
+    () => (selectedSampleIndex !== null && samples[selectedSampleIndex])
+      ? getSampleInstance(selectedSampleIndex)
+      : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedSampleIndex, samples]
+  );
 
-  const handleFadeInFrames = useCallback(async () => {
-    if (selectedSampleIndex !== null && selection) {
-      if (window.confirm(`Are you sure you want to apply fade in to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
-        const sample = samples[selectedSampleIndex];
-        if (sample) {
-          const originalSamples = sample.workSampleData();
-
-          const startFrame = Math.min(selection.startFrame, originalSamples.length - 1);
-          const endFrame = Math.min(selection.endFrame, originalSamples.length - 1);
-
-          const minFrame = Math.min(startFrame, endFrame);
-          const maxFrame = Math.max(startFrame, endFrame);
-
-          dispatch(fadeInFrames({
-            sampleIndex: selectedSampleIndex,
-            startFrame: minFrame,
-            endFrame: maxFrame
-          }));
-
-          const updatedSample = samples[selectedSampleIndex];
-          if (updatedSample && updatedSample.getFile()) {
-            await updatedSample.reload(isHalfSpeed);
-            dispatch(selectSample(selectedSampleIndex));
-          }
-
-          setSelection(null); // Clear selection after applying fade in
-        }
-      }
-    }
-  }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
-
-  const handleFadeOutFrames = useCallback(async () => {
-    if (selectedSampleIndex !== null && selection) {
-      if (window.confirm(`Are you sure you want to apply fade out to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`)) {
-        const sample = samples[selectedSampleIndex];
-        if (sample) {
-          const originalSamples = sample.workSampleData();
-
-          const startFrame = Math.min(selection.startFrame, originalSamples.length - 1);
-          const endFrame = Math.min(selection.endFrame, originalSamples.length - 1);
-
-          const minFrame = Math.min(startFrame, endFrame);
-          const maxFrame = Math.max(startFrame, endFrame);
-
-          dispatch(fadeOutFrames({
-            sampleIndex: selectedSampleIndex,
-            startFrame: minFrame,
-            endFrame: maxFrame
-          }));
-
-          const updatedSample = samples[selectedSampleIndex];
-          if (updatedSample && updatedSample.getFile()) {
-            await updatedSample.reload(isHalfSpeed);
-            dispatch(selectSample(selectedSampleIndex));
-          }
-
-          setSelection(null); // Clear selection after applying fade out
-        }
-      }
-    }
-  }, [dispatch, selectedSampleIndex, selection, samples, isHalfSpeed]);
-
-  // Convert the serializable sample to a Sample object if it exists
-  const tempSample = tempRecordedSample ? serializableToSample(tempRecordedSample) : null;
-
-  // tempSample is used directly, no need to create an array
-
-  // Create handlers for the temporary sample
   const handleSaveToKit = useCallback(() => {
-    dispatch(saveTempSampleToKit());
-  }, [dispatch]);
+    saveTempSampleToKit();
+  }, [saveTempSampleToKit]);
 
   const handleDiscard = useCallback(() => {
-    dispatch(clearTempRecordedSample());
-  }, [dispatch]);
+    clearTempRecordedSample();
+  }, [clearTempRecordedSample]);
 
-  // Handler for previewing the temporary sample
   const handlePreviewSample = useCallback(async () => {
     if (!tempSample) return;
-
     try {
-      // Stop any currently playing audio
       AudioService.stopAll();
-
-      // Get the sample data
-      const sampleData = tempSample.workSampleData();
-
-      // Convert the Int16Array to an ArrayBuffer
-      const buffer = new ArrayBuffer(sampleData.length * 2);
-      const view = new DataView(buffer);
-      for (let i = 0; i < sampleData.length; i++) {
-        view.setInt16(i * 2, sampleData[i], true);
-      }
-
-      // Determine the sample rate based on half-speed mode
+      const data = tempSample.workSampleData();
       const sampleRate = isHalfSpeed ? 5734 : 11468;
-
-      // Play the sample
-      await AudioService.playAudioBuffer(buffer, {}, sampleRate);
+      await AudioService.playAudioBuffer(int16ToArrayBuffer(data), {}, sampleRate);
     } catch (error) {
       console.error('Error playing sample:', error);
     }
   }, [tempSample, isHalfSpeed]);
 
-  // Calculate if the sample will fit in the kit
   const tempSampleSize = tempSample ? tempSample.lengthInBytes() : 0;
   const isSampleTooLarge = kitInfo && tempSample ? tempSampleSize > kitInfo.bytesFree : false;
 
   // If there's a temporary recorded sample, show the temp sample editor
   if (tempRecordedSample && tempSample) {
-
     return (
       <div className="sample-editor" role="region" aria-label="Sample editor">
         <div className="sample-editor-header">
@@ -413,8 +276,7 @@ export function SampleEditor({
           isLoading={isLoading}
           onUpdateName={(name) => {
             tempSample.setName(name);
-            // Convert to serializable format and update in the Redux store
-            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+            updateTempRecordedSample(sampleToSerialized(tempSample));
           }}
         />
 
@@ -426,30 +288,26 @@ export function SampleEditor({
           dither={tempSample.getDither()}
           maxTrim={Math.max(0, Math.floor(tempSample.untrimmedLengthInSamples() / 32) - 1)}
           isLoading={isLoading}
-          disableControls={true} // Disable volume, pitch, and trim controls for newly recorded samples
+          disableControls={true}
           onUpdateVolume={(value) => {
             tempSample.setVolumeDb(value);
             tempSample.processSamples();
-            // Convert to serializable format and update in the Redux store
-            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+            updateTempRecordedSample(sampleToSerialized(tempSample));
           }}
           onUpdatePitch={(value) => {
             tempSample.setPitchSemitones(value);
             tempSample.applyPitchShift(isHalfSpeed);
-            // Convert to serializable format and update in the Redux store
-            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+            updateTempRecordedSample(sampleToSerialized(tempSample));
           }}
           onUpdateTrim={(value) => {
             tempSample.setTrim(value);
             tempSample.processSamples();
-            // Convert to serializable format and update in the Redux store
-            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+            updateTempRecordedSample(sampleToSerialized(tempSample));
           }}
           onUpdateDither={(value) => {
             tempSample.setDither(value);
             tempSample.processSamples();
-            // Convert to serializable format and update in the Redux store
-            dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+            updateTempRecordedSample(sampleToSerialized(tempSample));
           }}
         />
 
@@ -471,8 +329,7 @@ export function SampleEditor({
                   Math.max(selection.startFrame, selection.endFrame)
                 );
                 setSelection(null);
-                // Convert to serializable format and update in the Redux store
-                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+                updateTempRecordedSample(sampleToSerialized(tempSample));
               }
             }}
             onCropFrames={() => {
@@ -482,8 +339,7 @@ export function SampleEditor({
                   Math.max(selection.startFrame, selection.endFrame)
                 );
                 setSelection(null);
-                // Convert to serializable format and update in the Redux store
-                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+                updateTempRecordedSample(sampleToSerialized(tempSample));
               }
             }}
             onFadeInFrames={() => {
@@ -493,8 +349,7 @@ export function SampleEditor({
                   Math.max(selection.startFrame, selection.endFrame)
                 );
                 setSelection(null);
-                // Convert to serializable format and update in the Redux store
-                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+                updateTempRecordedSample(sampleToSerialized(tempSample));
               }
             }}
             onFadeOutFrames={() => {
@@ -504,8 +359,7 @@ export function SampleEditor({
                   Math.max(selection.startFrame, selection.endFrame)
                 );
                 setSelection(null);
-                // Convert to serializable format and update in the Redux store
-                dispatch(updateTempRecordedSample(sampleToSerializable(tempSample)));
+                updateTempRecordedSample(sampleToSerialized(tempSample));
               }
             }}
           />
@@ -556,12 +410,10 @@ export function SampleEditor({
     );
   }
 
-  // If no sample index is selected at all, don't render anything
   if (selectedSampleIndex === null) {
     return null;
   }
 
-  // If an empty slot is selected, only show the recorder
   if (!samples[selectedSampleIndex]) {
     return (
       <div className="sample-editor" role="region" aria-label="Sample editor">
@@ -572,8 +424,6 @@ export function SampleEditor({
     );
   }
 
-  const sample = samples[selectedSampleIndex];
-
   return (
     <div className="sample-editor" role="region" aria-label="Sample editor">
       <SampleHeader
@@ -583,7 +433,7 @@ export function SampleEditor({
       />
 
       <SampleControls
-        sample={sample}
+        sample={sampleInstance!}
         volumeDb={volumeDb}
         pitchSemitones={pitchSemitones}
         trim={trim}

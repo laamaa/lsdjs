@@ -53,3 +53,11 @@ export function calculateSampleDuration(sampleLength: number, isHalfSpeed: boole
 export function sanitizeLSDJInput(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9 -]/g, '');
 }
+
+/**
+ * Converts an Int16Array to an ArrayBuffer suitable for AudioService.playAudioBuffer.
+ * Uses the typed array's underlying buffer directly (no manual DataView loop).
+ */
+export function int16ToArrayBuffer(data: Int16Array): ArrayBuffer {
+  return (data.buffer as ArrayBuffer).slice(data.byteOffset, data.byteOffset + data.byteLength);
+}

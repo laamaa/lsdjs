@@ -6,6 +6,7 @@ import App from './App';
 import {ThemeProvider} from './context/ThemeContext';
 import {SaveFileProvider} from './context/SaveFileContext';
 import {RomProvider} from './context/RomContext';
+import {KitProvider} from './context/KitContext';
 import {store} from './store';
 
 const root = ReactDOM.createRoot(
@@ -17,9 +18,11 @@ root.render(
     <Provider store={store}>
       <ThemeProvider>
         <RomProvider>
-          <SaveFileProvider>
-            <App />
-          </SaveFileProvider>
+          <KitProvider>
+            <SaveFileProvider>
+              <App />
+            </SaveFileProvider>
+          </KitProvider>
         </RomProvider>
       </ThemeProvider>
     </Provider>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useAppDispatch, addRecordedSample } from '../../../store';
+import { useKit } from '../../../context/KitContext';
 
 interface SampleRecorderProps {
   isLoading: boolean;
@@ -9,7 +9,7 @@ interface SampleRecorderProps {
  * Component for recording audio samples
  */
 export function SampleRecorder({ isLoading }: SampleRecorderProps) {
-  const dispatch = useAppDispatch();
+  const { addRecordedSample } = useKit();
   // We need to access the state for isHalfSpeed
   const [isRecording, setIsRecording] = useState(false);
   const [isRecordingAvailable, setIsRecordingAvailable] = useState(false);
@@ -93,8 +93,8 @@ export function SampleRecorder({ isLoading }: SampleRecorderProps) {
           // Decode the audio data
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-          // Dispatch the action to add the recorded sample
-          dispatch(addRecordedSample({ audioBuffer }));
+          // Add the recorded sample via context
+          addRecordedSample(audioBuffer);
         } catch (error) {
           console.error('Error processing recorded audio:', error);
           setRecordingError('Error processing recorded audio');
@@ -112,7 +112,7 @@ export function SampleRecorder({ isLoading }: SampleRecorderProps) {
       console.error('Error starting recording:', error);
       setRecordingError('Error starting recording');
     }
-  }, [dispatch, isRecordingAvailable, isLoading]);
+  }, [addRecordedSample, isRecordingAvailable, isLoading]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {

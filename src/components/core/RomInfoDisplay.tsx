@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {useRom} from '../../context/RomContext';
-import {useAppSelector} from '../../store';
+import {useKit} from '../../context/KitContext';
+import {serializedToSample} from '../../utils/sample-serialization';
 import './RomInfoDisplay.css';
 
 /**
@@ -9,11 +10,7 @@ import './RomInfoDisplay.css';
  */
 export function RomInfoDisplay() {
   const { romInfo, isLoading, error, loadRomFile, exportRomFile } = useRom();
-
-  // Temporarily read kit state from Redux until KitProvider migration (Step 4)
-  const kitInfo = useAppSelector(state => state.kit.kitInfo);
-  const samples = useAppSelector(state => state.kit.samples);
-  const useGbaPolarity = useAppSelector(state => state.kit.useGbaPolarity);
+  const kit = useKit();
 
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -22,7 +19,9 @@ export function RomInfoDisplay() {
   }
 
   function handleExportRom() {
-    exportRomFile({ kitInfo, samples, useGbaPolarity });
+    // Reconstruct Sample instances for SampleBankCompiler
+    const sampleInstances = kit.samples.map(s => s ? serializedToSample(s) : null);
+    exportRomFile({ kitInfo: kit.kitInfo, samples: sampleInstances, useGbaPolarity: kit.useGbaPolarity });
   }
 
   function handleToggleExpand() {
