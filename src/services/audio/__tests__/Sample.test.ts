@@ -35,12 +35,12 @@ describe('Sample', () => {
       expect(updatedOriginalSamples[1]).toBe(1000);
 
       // Frames 2-7 should have fade-in applied (increasing values)
-      expect(updatedOriginalSamples[2]).toBe(0); // 0% of 1000
-      expect(updatedOriginalSamples[3]).toBe(167); // ~16.7% of 1000
-      expect(updatedOriginalSamples[4]).toBe(333); // ~33.3% of 1000
-      expect(updatedOriginalSamples[5]).toBe(500); // 50% of 1000
-      expect(updatedOriginalSamples[6]).toBe(667); // ~66.7% of 1000
-      expect(updatedOriginalSamples[7]).toBe(833); // ~83.3% of 1000
+      expect(updatedOriginalSamples[2]).toBe(0); // 0/5 * 1000 = 0
+      expect(updatedOriginalSamples[3]).toBe(200); // 1/5 * 1000 = 200
+      expect(updatedOriginalSamples[4]).toBe(400); // 2/5 * 1000 = 400
+      expect(updatedOriginalSamples[5]).toBe(600); // 3/5 * 1000 = 600
+      expect(updatedOriginalSamples[6]).toBe(800); // 4/5 * 1000 = 800
+      expect(updatedOriginalSamples[7]).toBe(1000); // 5/5 * 1000 = 1000
 
       // Last two samples should be unchanged
       expect(updatedOriginalSamples[8]).toBe(1000);
@@ -73,8 +73,8 @@ describe('Sample', () => {
       const updatedOriginalSamples = sample.originalSamples;
 
       // Verify the fade-in effect was applied correctly (same as previous test)
-      expect(updatedOriginalSamples[2]).toBe(0); // 0% of 1000
-      expect(updatedOriginalSamples[7]).toBe(833); // ~83.3% of 1000
+      expect(updatedOriginalSamples[2]).toBe(0); // 0/5 * 1000 = 0
+      expect(updatedOriginalSamples[7]).toBe(1000); // 5/5 * 1000 = 1000
     });
 
     it('should return false if originalSamples is null', () => {
@@ -143,12 +143,12 @@ describe('Sample', () => {
       expect(updatedOriginalSamples[1]).toBe(1000);
 
       // Frames 2-7 should have fade-out applied (decreasing values)
-      expect(updatedOriginalSamples[2]).toBe(1000); // 100% of 1000
-      expect(updatedOriginalSamples[3]).toBe(833); // ~83.3% of 1000
-      expect(updatedOriginalSamples[4]).toBe(667); // ~66.7% of 1000
-      expect(updatedOriginalSamples[5]).toBe(500); // 50% of 1000
-      expect(updatedOriginalSamples[6]).toBe(333); // ~33.3% of 1000
-      expect(updatedOriginalSamples[7]).toBe(167); // ~16.7% of 1000
+      expect(updatedOriginalSamples[2]).toBe(1000); // 5/5 * 1000 = 1000
+      expect(updatedOriginalSamples[3]).toBe(800); // 4/5 * 1000 = 800
+      expect(updatedOriginalSamples[4]).toBe(600); // 3/5 * 1000 = 600
+      expect(updatedOriginalSamples[5]).toBe(400); // 2/5 * 1000 = 400
+      expect(updatedOriginalSamples[6]).toBe(200); // 1/5 * 1000 = 200
+      expect(updatedOriginalSamples[7]).toBe(0); // 0/5 * 1000 = 0
 
       // Last two samples should be unchanged
       expect(updatedOriginalSamples[8]).toBe(1000);
@@ -181,8 +181,8 @@ describe('Sample', () => {
       const updatedOriginalSamples = sample.originalSamples;
 
       // Verify the fade-out effect was applied correctly (same as previous test)
-      expect(updatedOriginalSamples[2]).toBe(1000); // 100% of 1000
-      expect(updatedOriginalSamples[7]).toBe(167); // ~16.7% of 1000
+      expect(updatedOriginalSamples[2]).toBe(1000); // 5/5 * 1000 = 1000
+      expect(updatedOriginalSamples[7]).toBe(0); // 0/5 * 1000 = 0
     });
 
     it('should return false if originalSamples is null', () => {

@@ -97,16 +97,16 @@ export function fadeInFrames(
     return null;
   }
 
-  // Create a new array with a copy of the original samples
   const newSamples = samples.slice();
 
-  // Apply fade-in to the selected range
-  const rangeLength = end - start + 1;
+  // Single frame: no fade to apply
+  if (start === end) {
+    return newSamples;
+  }
+
+  const divisor = end - start;
   for (let i = start; i <= end; i++) {
-    // Calculate fade factor (0 to 1) based on position in the range
-    const fadeFactor = (i - start) / rangeLength;
-    // Apply the fade factor to the sample
-    newSamples[i] = Math.round(samples[i] * fadeFactor);
+    newSamples[i] = Math.round(samples[i] * ((i - start) / divisor));
   }
 
   return newSamples;
@@ -134,16 +134,16 @@ export function fadeOutFrames(
     return null;
   }
 
-  // Create a new array with a copy of the original samples
   const newSamples = samples.slice();
 
-  // Apply fade-out to the selected range
-  const rangeLength = end - start + 1;
+  // Single frame: no fade to apply
+  if (start === end) {
+    return newSamples;
+  }
+
+  const divisor = end - start;
   for (let i = start; i <= end; i++) {
-    // Calculate fade factor (1 to 0) based on position in the range
-    const fadeFactor = 1 - ((i - start) / rangeLength);
-    // Apply the fade factor to the sample
-    newSamples[i] = Math.round(samples[i] * fadeFactor);
+    newSamples[i] = Math.round(samples[i] * (1 - (i - start) / divisor));
   }
 
   return newSamples;

@@ -269,7 +269,7 @@ export class FontProcessor {
       return this.getGfxTileOffset(tile);
     }
 
-    if (tile < 0 || tile >= FONT_CONSTANTS.TILE_COUNT) {
+    if (tile < 0) {
       throw new Error(`Invalid tile index: ${tile}`);
     }
 

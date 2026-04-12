@@ -31,7 +31,7 @@ import './SampleEditor.css';
 
 interface SampleEditorProps {
   selectedSampleIndex: number | null;
-  samples: Sample[];
+  samples: (Sample | null)[];
   isHalfSpeed: boolean;
   isLoading: boolean;
 }

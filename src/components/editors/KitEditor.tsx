@@ -293,7 +293,7 @@ export function KitEditor() {
           {renderSampleGrid()}
           <SampleEditor 
             selectedSampleIndex={selectedSampleIndex}
-            samples={samples.filter((sample: Sample | null): sample is Sample => sample !== null)}
+            samples={samples}
             isHalfSpeed={isHalfSpeed}
             isLoading={isLoading}
           />

@@ -33,7 +33,7 @@ export function toInt16Buffer(intBuffer: Int32Array): Int16Array {
  * @param volumeDb - The volume adjustment in decibels
  */
 export function normalize(samples: Int32Array, volumeDb: number): void {
-  let peak = Number.MIN_VALUE;
+  let peak = 0;
   for (let i = 0; i < samples.length; i++) {
     const s = samples[i];
     const normalizedS = s < 0 ? s / -32768 : s / 32767;
