@@ -611,7 +611,7 @@ export function SampleWaveform({
               x={containerWidth - 1}
               y={height - 1}
               textAnchor="end"
-              dominantBaseline="text-bottom"
+              dominantBaseline="text-after-edge"
               fontSize="12px"
               fontFamily="Arial"
               fill="var(--gb-darkest)"
@@ -624,7 +624,7 @@ export function SampleWaveform({
               x={containerWidth - 2}
               y={height - 2}
               textAnchor="end"
-              dominantBaseline="text-bottom"
+              dominantBaseline="text-after-edge"
               fontSize="12px"
               fontFamily="Arial"
               fill="var(--gb-lightest)"

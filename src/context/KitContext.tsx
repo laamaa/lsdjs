@@ -276,8 +276,7 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         const fileData = await FileService.loadBinaryFile('.kit');
         if (!fileData) return;
 
-        const kitView = new Uint8Array(fileData);
-        if (kitView[0] !== 0x60 || kitView[1] !== 0x40) {
+        if (!SampleBankCompiler.isKitBank(fileData)) {
           setError('Invalid kit file format');
           return;
         }

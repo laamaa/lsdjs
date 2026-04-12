@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useKit } from '../../context/KitContext';
-import { SerializedSample, serializedToSample, sampleToSerialized } from '../../utils/sample-serialization';
+import { SerializedSample, sampleToSerialized } from '../../utils/sample-serialization';
 import { SampleWaveform } from './SampleWaveform';
-import { AudioService } from '../../services/audio';
 import { SampleControls } from './sample-editor/SampleControls';
 import { SampleHeader } from './sample-editor/SampleHeader';
 import { SampleActions } from './sample-editor/SampleActions';
 import { SampleSelectionTools } from './sample-editor/SampleSelectionTools';
 import { SampleRecorder } from './sample-editor/SampleRecorder';
-import { convertSampleDataForWaveform, calculateSampleDuration, sanitizeLSDJInput, int16ToArrayBuffer } from '../../utils/sample-utils';
+import { TempSampleEditor } from './sample-editor/TempSampleEditor';
+import { useSampleOperations } from './sample-editor/useSampleOperations';
+import { convertSampleDataForWaveform, calculateSampleDuration, sanitizeLSDJInput } from '../../utils/sample-utils';
 import './SampleEditor.css';
 
 interface SampleEditorProps {
@@ -25,13 +26,12 @@ export function SampleEditor({
   isLoading
 }: SampleEditorProps) {
   const {
-    kitInfo, tempRecordedSample,
+    tempRecordedSample,
     playSample: kitPlaySample,
     updateSampleVolume, updateSamplePitch, updateSampleTrim,
     updateSampleDither, updateSampleName, removeSample: kitRemoveSample,
     revertSample: kitRevertSample, replaceSample,
     deleteFrames, cropFrames, fadeInFrames, fadeOutFrames,
-    saveTempSampleToKit, clearTempRecordedSample, updateTempRecordedSample,
     getSampleInstance,
   } = useKit();
 
@@ -176,58 +176,17 @@ export function SampleEditor({
     }
   }, [kitRevertSample]);
 
-  // Frame operations helper
-  const handleFrameOp = useCallback((
-    op: 'deleteFrames' | 'cropFrames' | 'fadeInFrames' | 'fadeOutFrames',
-    confirmMsg: string
-  ) => {
-    if (selectedSampleIndex !== null && selection) {
-      if (window.confirm(confirmMsg)) {
-        const s = samples[selectedSampleIndex];
-        if (s) {
-          const len = s.processedSamples.length;
-          const startFrame = Math.min(selection.startFrame, len - 1);
-          const endFrame = Math.min(selection.endFrame, len - 1);
-          const minFrame = Math.min(startFrame, endFrame);
-          const maxFrame = Math.max(startFrame, endFrame);
-
-          const ops = { deleteFrames, cropFrames, fadeInFrames, fadeOutFrames };
-          ops[op](selectedSampleIndex, minFrame, maxFrame);
-          setSelection(null);
-        }
-      }
-    }
-  }, [deleteFrames, cropFrames, fadeInFrames, fadeOutFrames, selectedSampleIndex, selection, samples]);
-
-  const handleDeleteFrames = useCallback(() => {
-    if (!selection) return;
-    handleFrameOp('deleteFrames',
-      `Are you sure you want to delete frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
-  }, [handleFrameOp, selection]);
-
-  const handleCropFrames = useCallback(() => {
-    if (!selection) return;
-    handleFrameOp('cropFrames',
-      `Are you sure you want to crop to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
-  }, [handleFrameOp, selection]);
-
-  const handleFadeInFrames = useCallback(() => {
-    if (!selection) return;
-    handleFrameOp('fadeInFrames',
-      `Are you sure you want to apply fade in to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
-  }, [handleFrameOp, selection]);
-
-  const handleFadeOutFrames = useCallback(() => {
-    if (!selection) return;
-    handleFrameOp('fadeOutFrames',
-      `Are you sure you want to apply fade out to frames ${Math.min(selection.startFrame, selection.endFrame)} to ${Math.max(selection.startFrame, selection.endFrame)}?`);
-  }, [handleFrameOp, selection]);
-
-  // Memoize Sample instances to avoid reconstructing on every render
-  const tempSample = useMemo(
-    () => tempRecordedSample ? serializedToSample(tempRecordedSample) : null,
-    [tempRecordedSample]
-  );
+  const { handleDeleteFrames, handleCropFrames, handleFadeInFrames, handleFadeOutFrames } =
+    useSampleOperations({
+      selectedSampleIndex,
+      selection,
+      samples,
+      deleteFrames,
+      cropFrames,
+      fadeInFrames,
+      fadeOutFrames,
+      setSelection,
+    });
 
   const sampleInstance = useMemo(
     () => (selectedSampleIndex !== null && samples[selectedSampleIndex])
@@ -237,176 +196,14 @@ export function SampleEditor({
     [selectedSampleIndex, samples]
   );
 
-  const handleSaveToKit = useCallback(() => {
-    saveTempSampleToKit();
-  }, [saveTempSampleToKit]);
-
-  const handleDiscard = useCallback(() => {
-    clearTempRecordedSample();
-  }, [clearTempRecordedSample]);
-
-  const handlePreviewSample = useCallback(async () => {
-    if (!tempSample) return;
-    try {
-      AudioService.stopAll();
-      const data = tempSample.workSampleData();
-      const sampleRate = isHalfSpeed ? 5734 : 11468;
-      await AudioService.playAudioBuffer(int16ToArrayBuffer(data), {}, sampleRate);
-    } catch (error) {
-      console.error('Error playing sample:', error);
-    }
-  }, [tempSample, isHalfSpeed]);
-
-  const tempSampleSize = tempSample ? tempSample.lengthInBytes() : 0;
-  const isSampleTooLarge = kitInfo && tempSample ? tempSampleSize > kitInfo.bytesFree : false;
-
   // If there's a temporary recorded sample, show the temp sample editor
-  if (tempRecordedSample && tempSample) {
+  if (tempRecordedSample) {
     return (
-      <div className="sample-editor" role="region" aria-label="Sample editor">
-        <div className="sample-editor-header">
-          <h3>Edit Recorded Sample</h3>
-          <p className="sample-editor-instructions">
-            Edit your recording to fit the kit requirements, then save it to the kit.
-          </p>
-        </div>
-
-        <SampleHeader
-          sampleName={tempSample.getName()}
-          isLoading={isLoading}
-          onUpdateName={(name) => {
-            tempSample.setName(name);
-            updateTempRecordedSample(sampleToSerialized(tempSample));
-          }}
-        />
-
-        <SampleControls
-          sample={tempSample}
-          volumeDb={tempSample.getVolumeDb()}
-          pitchSemitones={tempSample.getPitchSemitones()}
-          trim={tempSample.getTrim()}
-          dither={tempSample.getDither()}
-          maxTrim={Math.max(0, Math.floor(tempSample.untrimmedLengthInSamples() / 32) - 1)}
-          isLoading={isLoading}
-          disableControls={true}
-          onUpdateVolume={(value) => {
-            tempSample.setVolumeDb(value);
-            tempSample.processSamples();
-            updateTempRecordedSample(sampleToSerialized(tempSample));
-          }}
-          onUpdatePitch={(value) => {
-            tempSample.setPitchSemitones(value);
-            tempSample.applyPitchShift(isHalfSpeed);
-            updateTempRecordedSample(sampleToSerialized(tempSample));
-          }}
-          onUpdateTrim={(value) => {
-            tempSample.setTrim(value);
-            tempSample.processSamples();
-            updateTempRecordedSample(sampleToSerialized(tempSample));
-          }}
-          onUpdateDither={(value) => {
-            tempSample.setDither(value);
-            tempSample.processSamples();
-            updateTempRecordedSample(sampleToSerialized(tempSample));
-          }}
-        />
-
-        <div className="sample-waveform-selection">
-          <SampleWaveform
-            data={convertSampleDataForWaveform(tempSample.workSampleData())}
-            duration={calculateSampleDuration(tempSample.lengthInSamples(), isHalfSpeed)}
-            height={128}
-            onSelection={setSelection}
-            selection={selection}
-          />
-
-          <SampleSelectionTools
-            selection={selection}
-            onDeleteFrames={() => {
-              if (selection) {
-                tempSample.deleteFrames(
-                  Math.min(selection.startFrame, selection.endFrame),
-                  Math.max(selection.startFrame, selection.endFrame)
-                );
-                setSelection(null);
-                updateTempRecordedSample(sampleToSerialized(tempSample));
-              }
-            }}
-            onCropFrames={() => {
-              if (selection) {
-                tempSample.cropFrames(
-                  Math.min(selection.startFrame, selection.endFrame),
-                  Math.max(selection.startFrame, selection.endFrame)
-                );
-                setSelection(null);
-                updateTempRecordedSample(sampleToSerialized(tempSample));
-              }
-            }}
-            onFadeInFrames={() => {
-              if (selection) {
-                tempSample.fadeInFrames(
-                  Math.min(selection.startFrame, selection.endFrame),
-                  Math.max(selection.startFrame, selection.endFrame)
-                );
-                setSelection(null);
-                updateTempRecordedSample(sampleToSerialized(tempSample));
-              }
-            }}
-            onFadeOutFrames={() => {
-              if (selection) {
-                tempSample.fadeOutFrames(
-                  Math.min(selection.startFrame, selection.endFrame),
-                  Math.max(selection.startFrame, selection.endFrame)
-                );
-                setSelection(null);
-                updateTempRecordedSample(sampleToSerialized(tempSample));
-              }
-            }}
-          />
-        </div>
-
-        <div className="sample-editor-actions">
-          <div className="temp-sample-actions">
-            <button
-              onClick={handleDiscard}
-              className="discard-button"
-              disabled={isLoading}
-              aria-label="Discard recorded sample"
-            >
-              Discard
-            </button>
-            <button
-              onClick={handlePreviewSample}
-              className="preview-button"
-              disabled={isLoading}
-              aria-label="Preview recorded sample"
-            >
-              Preview
-            </button>
-            <button
-              onClick={handleSaveToKit}
-              className="save-button"
-              disabled={isLoading || isSampleTooLarge}
-              aria-label="Save sample to kit"
-              title={isSampleTooLarge ? "Sample is too large for the available space in the kit" : "Save this sample to the kit"}
-            >
-              Save to Kit
-            </button>
-          </div>
-          {kitInfo && (
-            <div className="sample-size-info">
-              <p>
-                {tempSampleSize}/{kitInfo.bytesFree} bytes
-                {isSampleTooLarge && (
-                  <span className="sample-size-warning">
-                    {" "}(need to trim {tempSampleSize - kitInfo.bytesFree} bytes)
-                  </span>
-                )}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      <TempSampleEditor
+        tempRecordedSample={tempRecordedSample}
+        isHalfSpeed={isHalfSpeed}
+        isLoading={isLoading}
+      />
     );
   }
 

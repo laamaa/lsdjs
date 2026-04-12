@@ -56,22 +56,7 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
         return;
       }
 
-      // Scan for kit banks
-      const kitBanks: number[] = [];
-      const kitNames: Record<number, string> = {};
-      const romView = new Uint8Array(fileData);
-      const BANK_SIZE = 0x4000;
-      const numBanks = Math.floor(romView.length / BANK_SIZE);
-
-      for (let bankIndex = 0; bankIndex < numBanks; bankIndex++) {
-        const bankOffset = bankIndex * BANK_SIZE;
-        if (romView[bankOffset] === 0x60 && romView[bankOffset + 1] === 0x40) {
-          kitBanks.push(bankIndex);
-          const kitName = SampleBankCompiler.extractKitNameFromRomBank(fileData, bankIndex);
-          if (kitName) kitNames[bankIndex] = kitName;
-        }
-      }
-
+      const { kitBanks, kitNames } = SampleBankCompiler.scanKitBanks(fileData);
       const parsedInfo: RomInfo = { ...baseInfo, kitBanks, kitNames };
 
       setRomInfo(parsedInfo);

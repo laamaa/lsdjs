@@ -7,13 +7,48 @@
 
 import { Sample } from './sample';
 
+const BANK_SIZE = 0x4000; // 16,384 bytes
+const KIT_MAGIC_0 = 0x60;
+const KIT_MAGIC_1 = 0x40;
+
 /**
  * Service for compiling samples into the format required by the LSDj ROM
  */
 export const SampleBankCompiler = {
   /**
+   * Check whether a ROM bank (or standalone kit buffer) contains a kit.
+   *
+   * @param data - ROM data or a single-bank kit buffer
+   * @param bankIndex - Bank index (defaults to 0, useful for standalone .kit files)
+   */
+  isKitBank(data: ArrayBuffer | Uint8Array, bankIndex: number = 0): boolean {
+    const view = data instanceof Uint8Array ? data : new Uint8Array(data);
+    const offset = bankIndex * BANK_SIZE;
+    return view[offset] === KIT_MAGIC_0 && view[offset + 1] === KIT_MAGIC_1;
+  },
+
+  /**
+   * Scan all banks in a ROM and return which ones are kit banks, with names.
+   */
+  scanKitBanks(romData: ArrayBuffer): { kitBanks: number[]; kitNames: Record<number, string> } {
+    const kitBanks: number[] = [];
+    const kitNames: Record<number, string> = {};
+    const numBanks = Math.floor(romData.byteLength / BANK_SIZE);
+
+    for (let bankIndex = 0; bankIndex < numBanks; bankIndex++) {
+      if (this.isKitBank(romData, bankIndex)) {
+        kitBanks.push(bankIndex);
+        const kitName = this.extractKitNameFromRomBank(romData, bankIndex);
+        if (kitName) kitNames[bankIndex] = kitName;
+      }
+    }
+
+    return { kitBanks, kitNames };
+  },
+
+  /**
    * Extract kit name from a ROM bank
-   * 
+   *
    * @param romData - The ROM data
    * @param bankIndex - The bank index to read from
    * @returns The kit name or null if not a kit bank
@@ -22,23 +57,12 @@ export const SampleBankCompiler = {
     romData: ArrayBuffer,
     bankIndex: number
   ): string | null {
-    const BANK_SIZE = 0x4000; // 16,384 bytes
-
-    // Create a view of the ROM data
-    const romView = new Uint8Array(romData);
-
-    // Calculate the bank offset
-    const bankOffset = bankIndex * BANK_SIZE;
-
-    // Check if this is a kit bank
-    const isKitBank = romView[bankOffset] === 0x60 && romView[bankOffset + 1] === 0x40;
-    if (!isKitBank) {
+    if (!this.isKitBank(romData, bankIndex)) {
       return null;
     }
 
-    // Read the kit name
     const processor = new BinaryProcessor(romData);
-    return processor.readAsciiString(bankOffset + 0x52, 6).trim();
+    return processor.readAsciiString(bankIndex * BANK_SIZE + 0x52, 6).trim();
   },
   /**
    * Compile samples into the format required by the LSDj ROM
@@ -52,7 +76,6 @@ export const SampleBankCompiler = {
     gameBoyAdvancePolarity: boolean = false
   ): { data: Uint8Array; byteLengths: number[] } {
     // Create a buffer for the compiled data (one bank size)
-    const BANK_SIZE = 0x4000; // 16,384 bytes
     const data = new Uint8Array(BANK_SIZE);
 
     // Fill the buffer with 0xFF (RST opcode)
@@ -161,7 +184,6 @@ export const SampleBankCompiler = {
     kitName: string,
     gameBoyAdvancePolarity: boolean = false
   ): ArrayBuffer {
-    const BANK_SIZE = 0x4000; // 16,384 bytes
     const MAX_SAMPLES = 15;
     const KIT_VERSION_1 = 1;
 
@@ -180,8 +202,8 @@ export const SampleBankCompiler = {
     }
 
     // Update the bank header
-    romView[bankOffset] = 0x60;
-    romView[bankOffset + 1] = 0x40;
+    romView[bankOffset] = KIT_MAGIC_0;
+    romView[bankOffset + 1] = KIT_MAGIC_1;
 
     // Update the sample length info
     let offset = bankOffset + 2;
@@ -246,7 +268,6 @@ export const SampleBankCompiler = {
     romData: ArrayBuffer,
     bankIndex: number
   ): Promise<{ samples: (Sample | null)[]; kitName: string }> {
-    const BANK_SIZE = 0x4000; // 16,384 bytes
     const MAX_SAMPLES = 15;
 
     // Create a view of the ROM data
@@ -256,9 +277,7 @@ export const SampleBankCompiler = {
     // Calculate the bank offset
     const bankOffset = bankIndex * BANK_SIZE;
 
-    // Check if this is a kit bank
-    const isKitBank = romView[bankOffset] === 0x60 && romView[bankOffset + 1] === 0x40;
-    if (!isKitBank) {
+    if (!this.isKitBank(romData, bankIndex)) {
       throw new Error('Not a kit bank');
     }
 
