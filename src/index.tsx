@@ -1,13 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {Provider} from 'react-redux';
 import './index.css';
 import App from './App';
 import {ThemeProvider} from './context/ThemeContext';
 import {SaveFileProvider} from './context/SaveFileContext';
 import {RomProvider} from './context/RomContext';
 import {KitProvider} from './context/KitContext';
-import {store} from './store';
+import {RomKitSync} from './context/RomKitSync';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -15,16 +14,15 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <Provider store={store}>
-      <ThemeProvider>
-        <RomProvider>
-          <KitProvider>
-            <SaveFileProvider>
-              <App />
-            </SaveFileProvider>
-          </KitProvider>
-        </RomProvider>
-      </ThemeProvider>
-    </Provider>
+    <ThemeProvider>
+      <RomProvider>
+        <KitProvider>
+          <RomKitSync />
+          <SaveFileProvider>
+            <App />
+          </SaveFileProvider>
+        </KitProvider>
+      </RomProvider>
+    </ThemeProvider>
   </React.StrictMode>
 );

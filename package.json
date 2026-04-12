@@ -20,10 +20,8 @@
     "test:cache-busting": "npm run build && node scripts/verify-cache-busting.js"
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^2.8.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-redux": "^9.2.0",
     "typescript": "^5.8.3"
   },
   "devDependencies": {

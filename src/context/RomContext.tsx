@@ -22,6 +22,7 @@ interface RomContextValue {
   error: string | null;
   loadRomFile: () => Promise<void>;
   exportRomFile: (kitData: ExportKitData) => Promise<void>;
+  updateRomData: (data: ArrayBuffer) => void;
 }
 
 const RomContext = createContext<RomContextValue | null>(null);
@@ -43,6 +44,8 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
   stateRef.current = { romInfo, romData };
 
   const actions = useMemo(() => ({
+    updateRomData: (data: ArrayBuffer) => setRomData(data),
+
     loadRomFile: () => withLoading('Failed to load ROM file', async () => {
       const fileData = await FileService.loadBinaryFile('.gb,.gbc');
       if (!fileData) return;

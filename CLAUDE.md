@@ -28,24 +28,34 @@ Requires Node >= 22. Build output goes to `build/`.
 
 ```
 React Components (src/components/)
-    ↓ dispatch actions
-Redux Store (src/store/) — 4 slices: rom, kit, saveFile, ui
-    ↓ async thunks call
+    ↓ call actions from context hooks
+Context Providers (src/context/) — 3 providers: Rom, Kit, SaveFile
+    ↓ call service functions
 Services (src/services/) — binary parsing, audio, file I/O
     ↓ operate on
 Binary Data (ArrayBuffer/Uint8Array) & Web Audio API
 ```
 
-### Redux Store (`src/store/`)
+### State Management (`src/context/`)
 
-- **romSlice** — ROM file loading/export, ROM metadata and binary data
-- **kitSlice** — Sample kit management, audio editing operations (volume, pitch, trim, fade, crop), audio playback via `kitMiddleware`
-- **saveFileSlice** — LSDJ `.sav` file loading, song import/export/selection
-- **uiSlice** — Active tab, modals, notifications
+Uses plain `useState` + React Context (no Redux). Each provider exposes state + actions via a custom hook.
 
-Use `useAppDispatch` and `useAppSelector` from `src/store/hooks.ts` (not plain `useDispatch`/`useSelector`).
+- **`RomProvider` / `useRom()`** — ROM file loading/export, ROM metadata (`romInfo`) and binary data (`romData`). Actions: `loadRomFile()`, `exportRomFile(kitData)`, `updateRomData(data)`.
+- **`KitProvider` / `useKit()`** — Sample kit management using `SerializedSample` (plain objects, not class instances). Actions for all sample editing (volume, pitch, trim, fade, crop, etc.), kit load/save, audio playback. File objects stored in a `useRef<Map>` inside the provider.
+- **`SaveFileProvider` / `useSaveFile()`** — LSDJ `.sav` file loading, song import/export/selection. Fully self-contained.
+- **`RomKitSync`** — Coordinator component (renders null) that auto-loads the first kit when a ROM is loaded and debounce-syncs kit changes back to ROM data.
+- **`useLoadingState`** — Shared hook for async loading/error state patterns used by all providers.
 
-Non-serializable data (ROM binary buffers, Sample instances) is stored in Redux with serialization checks disabled for those paths.
+**Key pattern:** Actions are defined in `useMemo` with `[]` deps for stable references. State needed inside actions is accessed via a `useRef` (stateRef pattern) to avoid stale closures.
+
+### Sample Data Model
+
+Samples are stored as `SerializedSample` (plain objects with `number[]` arrays) in context state, not as `Sample` class instances. The `Sample` class is instantiated on-demand when needed for:
+- `SampleBankCompiler` operations (compile/write ROM banks)
+- Audio playback
+- Editing operations that delegate to Sample methods
+
+Conversion utilities in `src/utils/sample-serialization.ts`: `sampleToSerialized()`, `serializedToSample()`, `calculateKitMemory()`.
 
 ### Services (`src/services/`)
 
@@ -55,7 +65,7 @@ Non-serializable data (ROM binary buffers, Sample instances) is stored in Redux 
 
 ### Components (`src/components/`)
 
-- **editors/** — Feature editors: `KitEditor`, `SampleEditor`, `FontEditor`, `PaletteEditor`, `SongManager`. These dispatch Redux thunks and render domain-specific UIs.
+- **editors/** — Feature editors: `KitEditor`, `SampleEditor`, `FontEditor`, `PaletteEditor`, `SongManager`. These call context actions and render domain-specific UIs.
 - **common/** — Reusable UI primitives (Button, Card, Layout, Slider, etc.), barrel-exported from `index.ts`
 - **core/** — `RomInfoDisplay`, `AudioPlaybackTest`
 
@@ -74,7 +84,7 @@ Non-serializable data (ROM binary buffers, Sample instances) is stored in Redux 
 ## Testing
 
 - Framework: **Vitest** with **jsdom** environment and **@testing-library/react**
-- Test helper: `renderWithRedux()` in `src/utils/test-utils.tsx` wraps components with Redux Provider
+- Test helper: `renderWithProviders()` in `src/utils/test-utils.tsx` wraps components with context providers
 - Setup file: `src/setupTests.ts` mocks File System Access API, Web Audio, Canvas, ResizeObserver
 - Coverage thresholds: 80% (statements, branches, functions, lines)
 - Tests live in `__tests__/` directories alongside the code they test

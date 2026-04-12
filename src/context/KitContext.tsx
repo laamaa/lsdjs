@@ -11,6 +11,7 @@ import {
   MAX_SAMPLES,
 } from '../utils/sample-serialization';
 import { int16ToArrayBuffer } from '../utils/sample-utils';
+import { resample } from '../services/audio/sample/SampleUtils';
 
 export interface KitInfo {
   name: string;
@@ -101,41 +102,24 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     return sampleToSerialized(instance);
   }
 
-  // Helper: update a single sample in the array + recalculate kit memory
   function updateSampleAt(index: number, updater: (s: SerializedSample) => SerializedSample) {
-    setSamples(prev => {
-      const s = prev[index];
-      if (!s) return prev;
-      const updated = [...prev];
-      updated[index] = updater(s);
-      return updated;
-    });
-    // Recalculate memory outside the setSamples updater to avoid nested state updates
-    setKitInfo(prev => {
-      if (!prev) return prev;
-      // Use stateRef to get the latest samples after the setSamples call is batched
-      const latestSamples = [...stateRef.current.samples];
-      const s = latestSamples[index];
-      if (s) latestSamples[index] = updater(s);
-      const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(latestSamples);
-      return { ...prev, totalSampleSizeInBytes, bytesFree };
-    });
+    const s = stateRef.current.samples[index];
+    if (!s) return;
+    const newSamples = [...stateRef.current.samples];
+    newSamples[index] = updater(s);
+
+    setSamples(newSamples);
+    const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(newSamples);
+    setKitInfo(prev => prev ? { ...prev, totalSampleSizeInBytes, bytesFree } : prev);
   }
 
-  // Helper: replace an entire sample at a given index
   function replaceSampleAt(index: number, sample: SerializedSample) {
-    setSamples(prev => {
-      const updated = [...prev];
-      updated[index] = sample;
-      return updated;
-    });
-    setKitInfo(prev => {
-      if (!prev) return prev;
-      const latestSamples = [...stateRef.current.samples];
-      latestSamples[index] = sample;
-      const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(latestSamples);
-      return { ...prev, totalSampleSizeInBytes, bytesFree };
-    });
+    const newSamples = [...stateRef.current.samples];
+    newSamples[index] = sample;
+
+    setSamples(newSamples);
+    const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(newSamples);
+    setKitInfo(prev => prev ? { ...prev, totalSampleSizeInBytes, bytesFree } : prev);
   }
 
   // Helper: frame editing operations (delete, crop, fadeIn, fadeOut)
@@ -171,25 +155,16 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     },
 
     removeSample: (index: number) => {
-      setSamples(prev => {
-        const newSamples = [...prev];
-        for (let i = index; i < newSamples.length - 1; i++) {
-          newSamples[i] = newSamples[i + 1];
-        }
-        newSamples[newSamples.length - 1] = null;
-        return newSamples;
-      });
-      // Recalculate memory outside setSamples updater
-      setKitInfo(prev => {
-        if (!prev) return prev;
-        const latestSamples = [...stateRef.current.samples];
-        for (let i = index; i < latestSamples.length - 1; i++) {
-          latestSamples[i] = latestSamples[i + 1];
-        }
-        latestSamples[latestSamples.length - 1] = null;
-        const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(latestSamples);
-        return { ...prev, totalSampleSizeInBytes, bytesFree };
-      });
+      const newSamples = [...stateRef.current.samples];
+      for (let i = index; i < newSamples.length - 1; i++) {
+        newSamples[i] = newSamples[i + 1];
+      }
+      newSamples[newSamples.length - 1] = null;
+
+      setSamples(newSamples);
+      const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(newSamples);
+      setKitInfo(prev => prev ? { ...prev, totalSampleSizeInBytes, bytesFree } : prev);
+
       // Shift file map entries
       const map = fileMapRef.current;
       for (let i = index; i < MAX_SAMPLES - 1; i++) {
@@ -400,7 +375,6 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         const outSampleRate = halfSpeed ? 5734 : 11468;
 
         // Resample
-        const { resample } = await import('../services/audio/sample/SampleUtils');
         const resampled = resample(sampleData, inSampleRate, outSampleRate);
 
         setTempRecordedSample({
