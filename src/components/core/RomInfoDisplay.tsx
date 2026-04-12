@@ -1,5 +1,6 @@
 import {useState} from 'react';
-import {loadRomFile, exportRomFile, useAppDispatch, useAppSelector} from '../../store';
+import {useRom} from '../../context/RomContext';
+import {useAppSelector} from '../../store';
 import './RomInfoDisplay.css';
 
 /**
@@ -7,41 +8,34 @@ import './RomInfoDisplay.css';
  * This is a minimal UI to demonstrate file loading and basic ROM information display
  */
 export function RomInfoDisplay() {
-  const dispatch = useAppDispatch();
-  const romInfo = useAppSelector(state => state.rom.romInfo);
-  const isLoading = useAppSelector(state => state.rom.isLoading);
-  const error = useAppSelector(state => state.rom.error);
+  const { romInfo, isLoading, error, loadRomFile, exportRomFile } = useRom();
+
+  // Temporarily read kit state from Redux until KitProvider migration (Step 4)
+  const kitInfo = useAppSelector(state => state.kit.kitInfo);
+  const samples = useAppSelector(state => state.kit.samples);
+  const useGbaPolarity = useAppSelector(state => state.kit.useGbaPolarity);
+
   const [isExpanded, setIsExpanded] = useState(false);
 
-  /**
-   * Handle file selection and load ROM information
-   */
-  async function handleFileSelect() {
-    dispatch(loadRomFile());
+  function handleFileSelect() {
+    loadRomFile();
   }
 
-  /**
-   * Handle export button click and export ROM file
-   */
-  async function handleExportRom() {
-    dispatch(exportRomFile());
+  function handleExportRom() {
+    exportRomFile({ kitInfo, samples, useGbaPolarity });
   }
 
-  /**
-   * Toggle the expanded state of the ROM info table
-   */
   function handleToggleExpand() {
     setIsExpanded(!isExpanded);
   }
 
-  // Generate unique IDs for headings
   const mainHeadingId = `rom-info-heading-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
     <div className="rom-info-container" role="region" aria-labelledby={mainHeadingId}>
 
       <div className="button-container">
-        <button 
+        <button
           onClick={handleFileSelect}
           disabled={isLoading}
           className="file-select-button"
@@ -52,7 +46,7 @@ export function RomInfoDisplay() {
         </button>
 
         {romInfo && (
-          <button 
+          <button
             onClick={handleExportRom}
             disabled={isLoading}
             className="file-export-button"
@@ -74,7 +68,7 @@ export function RomInfoDisplay() {
         <div className="rom-info" role="region" aria-label="ROM file details">
           <div className="rom-info-header">
             <h2 id="rom-title">{romInfo.title}</h2>
-            <button 
+            <button
               className={`gfx-toggle-icon ${isExpanded ? 'active' : ''}`}
               onClick={handleToggleExpand}
               aria-pressed={isExpanded}

@@ -5,6 +5,7 @@ import './index.css';
 import App from './App';
 import {ThemeProvider} from './context/ThemeContext';
 import {SaveFileProvider} from './context/SaveFileContext';
+import {RomProvider} from './context/RomContext';
 import {store} from './store';
 
 const root = ReactDOM.createRoot(
@@ -15,9 +16,11 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ThemeProvider>
-        <SaveFileProvider>
-          <App />
-        </SaveFileProvider>
+        <RomProvider>
+          <SaveFileProvider>
+            <App />
+          </SaveFileProvider>
+        </RomProvider>
       </ThemeProvider>
     </Provider>
   </React.StrictMode>

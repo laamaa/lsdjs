@@ -1,8 +1,8 @@
 import React from 'react';
-import { screen, fireEvent } from '@testing-library/react';
-import { renderWithRedux } from '../../../utils/test-utils';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { FontEditor } from '../FontEditor';
 import { FontProcessor } from '../../../services/binary/FontProcessor';
+import { RomProvider } from '../../../context/RomContext';
 import { vi } from 'vitest';
 
 // Mock the FontMap component to avoid canvas-related errors
@@ -64,36 +64,42 @@ vi.mock('../../../services/binary/RomProcessor', () => {
   };
 });
 
+const mockRomState = {
+  romInfo: {
+    title: 'Test ROM',
+    version: '1.0',
+    isValid: true,
+    size: 1024,
+    banks: 2,
+    hasPalettes: false,
+    hasFonts: true,
+    kitBanks: [],
+    kitNames: {},
+  },
+  romData: new ArrayBuffer(1024),
+};
+
+function renderFontEditor(romState?: { romInfo: typeof mockRomState.romInfo | null; romData: ArrayBuffer | null }) {
+  const initialState = romState ?? { romInfo: null, romData: null };
+  return render(
+    <RomProvider initialState={initialState}>
+      <FontEditor />
+    </RomProvider>
+  );
+}
+
 describe('FontEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders a message when no ROM is loaded', () => {
-    renderWithRedux(<FontEditor />);
+    renderFontEditor();
     expect(screen.getByText(/Please load a ROM file with font data to use the Font Editor/i)).toBeInTheDocument();
   });
 
   it('renders the font editor when a ROM with fonts is loaded', () => {
-    // Create a mock ROM state with font data
-    const preloadedState = {
-      rom: {
-        romInfo: {
-          title: 'Test ROM',
-          version: '1.0',
-          isValid: true,
-          size: 1024,
-          banks: 2,
-          hasPalettes: false,
-          hasFonts: true,
-        },
-        romData: new ArrayBuffer(1024),
-        isLoading: false,
-        error: null,
-      },
-    };
-
-    renderWithRedux(<FontEditor />, { preloadedState });
+    renderFontEditor(mockRomState);
 
     // Check that the font editor components are rendered
     expect(screen.getByRole('combobox')).toBeInTheDocument(); // Font selector
@@ -102,50 +108,14 @@ describe('FontEditor', () => {
   });
 
   it('initializes the FontProcessor when a ROM is loaded', () => {
-    // Create a mock ROM state with font data
-    const preloadedState = {
-      rom: {
-        romInfo: {
-          title: 'Test ROM',
-          version: '1.0',
-          isValid: true,
-          size: 1024,
-          banks: 2,
-          hasPalettes: false,
-          hasFonts: true,
-        },
-        romData: new ArrayBuffer(1024),
-        isLoading: false,
-        error: null,
-      },
-    };
-
-    renderWithRedux(<FontEditor />, { preloadedState });
+    renderFontEditor(mockRomState);
 
     // Check that the FontProcessor was initialized
     expect(FontProcessor).toHaveBeenCalled();
   });
 
   it('changes the selected font when the dropdown is changed', () => {
-    // Create a mock ROM state with font data
-    const preloadedState = {
-      rom: {
-        romInfo: {
-          title: 'Test ROM',
-          version: '1.0',
-          isValid: true,
-          size: 1024,
-          banks: 2,
-          hasPalettes: false,
-          hasFonts: true,
-        },
-        romData: new ArrayBuffer(1024),
-        isLoading: false,
-        error: null,
-      },
-    };
-
-    renderWithRedux(<FontEditor />, { preloadedState });
+    renderFontEditor(mockRomState);
 
     // Find the font selector dropdown
     const fontSelector = screen.getByRole('combobox');
@@ -158,25 +128,7 @@ describe('FontEditor', () => {
   });
 
   it('toggles graphics characters when the button is clicked', () => {
-    // Create a mock ROM state with font data
-    const preloadedState = {
-      rom: {
-        romInfo: {
-          title: 'Test ROM',
-          version: '1.0',
-          isValid: true,
-          size: 1024,
-          banks: 2,
-          hasPalettes: false,
-          hasFonts: true,
-        },
-        romData: new ArrayBuffer(1024),
-        isLoading: false,
-        error: null,
-      },
-    };
-
-    renderWithRedux(<FontEditor />, { preloadedState });
+    renderFontEditor(mockRomState);
 
     // Find the graphics toggle button
     const gfxToggleButton = screen.getByRole('button', { name: /Show all characters/i });
@@ -206,25 +158,7 @@ describe('FontEditor', () => {
       rotateTileRight,
     }));
 
-    // Create a mock ROM state with font data
-    const preloadedState = {
-      rom: {
-        romInfo: {
-          title: 'Test ROM',
-          version: '1.0',
-          isValid: true,
-          size: 1024,
-          banks: 2,
-          hasPalettes: false,
-          hasFonts: true,
-        },
-        romData: new ArrayBuffer(1024),
-        isLoading: false,
-        error: null,
-      },
-    };
-
-    renderWithRedux(<FontEditor />, { preloadedState });
+    renderFontEditor(mockRomState);
 
     // Find the rotation buttons
     const upButton = screen.getByRole('button', { name: /Rotate up/i });
@@ -247,25 +181,7 @@ describe('FontEditor', () => {
   });
 
   it('changes the selected color when color buttons are clicked', () => {
-    // Create a mock ROM state with font data
-    const preloadedState = {
-      rom: {
-        romInfo: {
-          title: 'Test ROM',
-          version: '1.0',
-          isValid: true,
-          size: 1024,
-          banks: 2,
-          hasPalettes: false,
-          hasFonts: true,
-        },
-        romData: new ArrayBuffer(1024),
-        isLoading: false,
-        error: null,
-      },
-    };
-
-    renderWithRedux(<FontEditor />, { preloadedState });
+    renderFontEditor(mockRomState);
 
     // Find the color buttons for left click
     const leftColorButtons = screen.getAllByLabelText(/Select color \d for left click/);

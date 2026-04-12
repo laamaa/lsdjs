@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSelector } from 'react-redux';
 import { Button } from '../common';
 import { TileEditor } from './TileEditor';
 import { FontMap } from './FontMap';
@@ -9,7 +8,7 @@ import { FontColor, FONT_CONSTANTS } from '../../types/font';
 import { FontProcessor } from '../../services/binary/FontProcessor';
 import { BinaryProcessor } from '../../services/binary';
 import { RomProcessor } from '../../services/binary';
-import { RootState } from '../../store';
+import { useRom } from '../../context/RomContext';
 import './FontEditor.css';
 
 /**
@@ -17,8 +16,7 @@ import './FontEditor.css';
  * Integrates TileEditor, FontMap, and ColorSelector components
  */
 export function FontEditor() {
-  const romData = useSelector((state: RootState) => state.rom.romData);
-  const romInfo = useSelector((state: RootState) => state.rom.romInfo);
+  const { romData, romInfo } = useRom();
 
   // State for the font editor
   const [selectedFont, setSelectedFont] = useState(0);

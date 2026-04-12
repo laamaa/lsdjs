@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useMemo, useRef, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, useRef, ReactNode } from 'react';
 import { FileService } from '../services/file/FileService';
 import { SaveFileInfo, SaveFileProcessor } from '../services/binary/SaveFileProcessor';
 import { BinaryProcessor } from '../services/binary';
+import { useLoadingState } from './useLoadingState';
 
 interface SaveFileContextValue {
   saveFileInfo: SaveFileInfo | null;
@@ -27,24 +28,14 @@ export function SaveFileProvider({ children, initialState }: SaveFileProviderPro
   const [saveFileInfo, setSaveFileInfo] = useState<SaveFileInfo | null>(initialState?.saveFileInfo ?? null);
   const [saveFileData, setSaveFileData] = useState<ArrayBuffer | null>(null);
   const [selectedSongId, setSelectedSongId] = useState<number | null>(initialState?.selectedSongId ?? null);
-  const [isLoading, setIsLoading] = useState(initialState?.isLoading ?? false);
-  const [error, setError] = useState<string | null>(initialState?.error ?? null);
+  const { isLoading, error, setError, withLoading } = useLoadingState(
+    initialState?.isLoading ?? false,
+    initialState?.error ?? null
+  );
 
   // Ref holds latest state for stable action closures
   const stateRef = useRef({ saveFileInfo, saveFileData, selectedSongId });
   stateRef.current = { saveFileInfo, saveFileData, selectedSongId };
-
-  const withLoading = useCallback(async (errorLabel: string, fn: () => Promise<void>) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await fn();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : errorLabel);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
 
   const actions = useMemo<Omit<SaveFileContextValue, 'saveFileInfo' | 'selectedSongId' | 'isLoading' | 'error'>>(() => ({
     selectSong: (songId: number | null) => setSelectedSongId(songId),

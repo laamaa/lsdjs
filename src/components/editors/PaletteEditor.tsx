@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useSelector } from 'react-redux';
 import { DropdownSelector } from '../common/DropdownSelector';
 import { ColorPicker } from './ColorPicker';
 import { SwatchPanel } from './SwatchPanel';
 import { RGB555, Palette, ColorSet } from '../../types/palette';
 import { randomRGB555 } from './SwatchPair';
 import { PaletteProcessor } from '../../services/binary/PaletteProcessor';
-import { RootState } from '../../store';
+import { useRom } from '../../context/RomContext';
 import './PaletteEditor.css';
 
 // Color constants for the preview images
@@ -77,8 +76,7 @@ const COLOR_TO_SWATCH_MAPPING = {
  * Integrates ColorPicker and SwatchPanel components
  */
 export function PaletteEditor() {
-  const romData = useSelector((state: RootState) => state.rom.romData);
-  const romInfo = useSelector((state: RootState) => state.rom.romInfo);
+  const { romData, romInfo } = useRom();
 
   // State for the palette editor
   const [selectedPalette, setSelectedPalette] = useState(0);
