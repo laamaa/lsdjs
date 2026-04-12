@@ -4,6 +4,7 @@ import {Provider} from 'react-redux';
 import './index.css';
 import App from './App';
 import {ThemeProvider} from './context/ThemeContext';
+import {SaveFileProvider} from './context/SaveFileContext';
 import {store} from './store';
 
 const root = ReactDOM.createRoot(
@@ -14,7 +15,9 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ThemeProvider>
-        <App />
+        <SaveFileProvider>
+          <App />
+        </SaveFileProvider>
       </ThemeProvider>
     </Provider>
   </React.StrictMode>
