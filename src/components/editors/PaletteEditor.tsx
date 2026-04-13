@@ -6,7 +6,7 @@ import { PalettePreview } from './PalettePreview';
 import { RGB555, Palette, ColorSet } from '../../types/palette';
 import { randomRGB555 } from './SwatchPair';
 import { PaletteProcessor } from '../../services/binary/PaletteProcessor';
-import { useRom } from '../../context/RomContext';
+import { useRomState } from '../../context/RomContext';
 import './PaletteEditor.css';
 
 /**
@@ -14,7 +14,7 @@ import './PaletteEditor.css';
  * Integrates ColorPicker and SwatchPanel components
  */
 export function PaletteEditor() {
-  const { romData, romInfo } = useRom();
+  const { romData, romInfo } = useRomState();
 
   // State for the palette editor
   const [selectedPalette, setSelectedPalette] = useState(0);

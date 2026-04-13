@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useRom } from '../../context/RomContext';
-import { useKit } from '../../context/KitContext';
+import { useRomState } from '../../context/RomContext';
+import { useKitState, useKitActions } from '../../context/KitContext';
 import { SampleEditor } from './SampleEditor';
 import { BankNameSelector } from '../common/BankNameSelector';
 import { CustomCheckbox } from '../common';
@@ -8,14 +8,16 @@ import { SerializedSample } from '../../utils/sample-serialization';
 import './KitEditor.css';
 
 export function KitEditor() {
-  const { romData, romInfo } = useRom();
+  const { romData, romInfo } = useRomState();
   const {
     kitInfo, samples, selectedSampleIndex, selectedBankIndex,
     isHalfSpeed, useGbaPolarity, isLoading, error,
+  } = useKitState();
+  const {
     selectSample, selectBank, setHalfSpeed, setGbaPolarity,
     renameKit, clearKit, playSample, addSample,
     loadKitFromFile, loadKitFromRomBank, saveKitToFile,
-  } = useKit();
+  } = useKitActions();
 
   const [kitName, setKitName] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);

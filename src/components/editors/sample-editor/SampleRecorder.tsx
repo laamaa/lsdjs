@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useKit } from '../../../context/KitContext';
+import { useKitActions } from '../../../context/KitContext';
 
 interface SampleRecorderProps {
   isLoading: boolean;
@@ -9,7 +9,7 @@ interface SampleRecorderProps {
  * Component for recording audio samples
  */
 export function SampleRecorder({ isLoading }: SampleRecorderProps) {
-  const { addRecordedSample } = useKit();
+  const { addRecordedSample } = useKitActions();
   // We need to access the state for isHalfSpeed
   const [isRecording, setIsRecording] = useState(false);
   const [isRecordingAvailable, setIsRecordingAvailable] = useState(false);

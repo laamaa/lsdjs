@@ -1,6 +1,6 @@
 import {useState} from 'react';
-import {useRom} from '../../context/RomContext';
-import {useKit} from '../../context/KitContext';
+import {useRomState, useRomActions} from '../../context/RomContext';
+import {useKitState} from '../../context/KitContext';
 import {serializedToSample} from '../../utils/sample-serialization';
 import './RomInfoDisplay.css';
 
@@ -9,8 +9,9 @@ import './RomInfoDisplay.css';
  * This is a minimal UI to demonstrate file loading and basic ROM information display
  */
 export function RomInfoDisplay() {
-  const { romInfo, isLoading, error, loadRomFile, exportRomFile } = useRom();
-  const kit = useKit();
+  const { romInfo, isLoading, error } = useRomState();
+  const { loadRomFile, exportRomFile } = useRomActions();
+  const kit = useKitState();
 
   const [isExpanded, setIsExpanded] = useState(false);
 

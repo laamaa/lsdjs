@@ -4,11 +4,14 @@ import { SaveFileInfo, SaveFileProcessor } from '../services/binary/SaveFileProc
 import { BinaryProcessor } from '../services/binary';
 import { useLoadingState } from './useLoadingState';
 
-interface SaveFileContextValue {
+export interface SaveFileState {
   saveFileInfo: SaveFileInfo | null;
   selectedSongId: number | null;
   isLoading: boolean;
   error: string | null;
+}
+
+export interface SaveFileActions {
   loadSaveFile: () => Promise<void>;
   exportSong: (songId: number) => Promise<void>;
   exportSaveFile: () => Promise<void>;
@@ -17,11 +20,14 @@ interface SaveFileContextValue {
   selectSong: (songId: number | null) => void;
 }
 
-const SaveFileContext = createContext<SaveFileContextValue | null>(null);
+type SaveFileContextValue = SaveFileState & SaveFileActions;
+
+const SaveFileStateContext = createContext<SaveFileState | null>(null);
+const SaveFileActionsContext = createContext<SaveFileActions | null>(null);
 
 interface SaveFileProviderProps {
   children: ReactNode;
-  initialState?: Partial<Pick<SaveFileContextValue, 'saveFileInfo' | 'selectedSongId' | 'isLoading' | 'error'>>;
+  initialState?: Partial<SaveFileState>;
 }
 
 export function SaveFileProvider({ children, initialState }: SaveFileProviderProps) {
@@ -37,7 +43,7 @@ export function SaveFileProvider({ children, initialState }: SaveFileProviderPro
   const stateRef = useRef({ saveFileInfo, saveFileData, selectedSongId });
   stateRef.current = { saveFileInfo, saveFileData, selectedSongId };
 
-  const actions = useMemo<Omit<SaveFileContextValue, 'saveFileInfo' | 'selectedSongId' | 'isLoading' | 'error'>>(() => ({
+  const actions = useMemo<SaveFileActions>(() => ({
     selectSong: (songId: number | null) => setSelectedSongId(songId),
 
     loadSaveFile: () => withLoading('Failed to load save file', async () => {
@@ -117,20 +123,34 @@ export function SaveFileProvider({ children, initialState }: SaveFileProviderPro
     }),
   }), [withLoading]);
 
-  const value = useMemo<SaveFileContextValue>(
-    () => ({ saveFileInfo, selectedSongId, isLoading, error, ...actions }),
-    [saveFileInfo, selectedSongId, isLoading, error, actions]
+  const stateValue = useMemo<SaveFileState>(
+    () => ({ saveFileInfo, selectedSongId, isLoading, error }),
+    [saveFileInfo, selectedSongId, isLoading, error]
   );
 
   return (
-    <SaveFileContext.Provider value={value}>
-      {children}
-    </SaveFileContext.Provider>
+    <SaveFileStateContext.Provider value={stateValue}>
+      <SaveFileActionsContext.Provider value={actions}>
+        {children}
+      </SaveFileActionsContext.Provider>
+    </SaveFileStateContext.Provider>
   );
 }
 
-export function useSaveFile(): SaveFileContextValue {
-  const ctx = useContext(SaveFileContext);
-  if (!ctx) throw new Error('useSaveFile must be used within SaveFileProvider');
+export function useSaveFileState(): SaveFileState {
+  const ctx = useContext(SaveFileStateContext);
+  if (!ctx) throw new Error('useSaveFileState must be used within SaveFileProvider');
   return ctx;
+}
+
+export function useSaveFileActions(): SaveFileActions {
+  const ctx = useContext(SaveFileActionsContext);
+  if (!ctx) throw new Error('useSaveFileActions must be used within SaveFileProvider');
+  return ctx;
+}
+
+export function useSaveFile(): SaveFileContextValue {
+  const state = useSaveFileState();
+  const actions = useSaveFileActions();
+  return { ...state, ...actions };
 }

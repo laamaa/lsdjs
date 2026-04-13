@@ -21,7 +21,7 @@ export interface KitInfo {
   bytesFree: number;
 }
 
-interface KitContextValue {
+export interface KitState {
   kitInfo: KitInfo | null;
   samples: (SerializedSample | null)[];
   selectedSampleIndex: number | null;
@@ -31,7 +31,9 @@ interface KitContextValue {
   isLoading: boolean;
   error: string | null;
   tempRecordedSample: SerializedSample | null;
-  // Actions
+}
+
+export interface KitActions {
   selectSample: (index: number | null) => void;
   selectBank: (index: number) => void;
   setHalfSpeed: (value: boolean) => void;
@@ -52,7 +54,6 @@ interface KitContextValue {
   replaceSample: (index: number, sample: SerializedSample) => void;
   clearTempRecordedSample: () => void;
   updateTempRecordedSample: (sample: SerializedSample) => void;
-  // Async actions
   loadKitFromRomBank: (romData: ArrayBuffer, bankIndex: number) => Promise<void>;
   loadKitFromFile: (romData: ArrayBuffer) => Promise<ArrayBuffer | null>;
   saveKitToFile: (romData: ArrayBuffer) => Promise<void>;
@@ -60,17 +61,19 @@ interface KitContextValue {
   addRecordedSample: (audioBuffer: AudioBuffer) => Promise<void>;
   saveTempSampleToKit: () => void;
   playSample: (sampleIndex: number) => Promise<void>;
-  // For pitch shift — returns the reconstructed Sample for direct manipulation
   getSampleInstance: (index: number) => Sample | null;
 }
 
-const KitContext = createContext<KitContextValue | null>(null);
+type KitContextValue = KitState & KitActions;
+
+const KitStateContext = createContext<KitState | null>(null);
+const KitActionsContext = createContext<KitActions | null>(null);
 
 const BANK_SIZE = 0x4000;
 
 interface KitProviderProps {
   children: ReactNode;
-  initialState?: Partial<Pick<KitContextValue, 'kitInfo' | 'samples' | 'selectedSampleIndex' | 'selectedBankIndex' | 'isHalfSpeed' | 'useGbaPolarity' | 'isLoading' | 'error' | 'tempRecordedSample'>>;
+  initialState?: Partial<KitState>;
 }
 
 export function KitProvider({ children, initialState }: KitProviderProps) {
@@ -441,25 +444,38 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [withLoading]);
 
-  const value = useMemo<KitContextValue>(
+  const stateValue = useMemo<KitState>(
     () => ({
       kitInfo, samples, selectedSampleIndex, selectedBankIndex,
       isHalfSpeed, useGbaPolarity, isLoading, error, tempRecordedSample,
-      ...actions,
     }),
     [kitInfo, samples, selectedSampleIndex, selectedBankIndex,
-     isHalfSpeed, useGbaPolarity, isLoading, error, tempRecordedSample, actions]
+     isHalfSpeed, useGbaPolarity, isLoading, error, tempRecordedSample]
   );
 
   return (
-    <KitContext.Provider value={value}>
-      {children}
-    </KitContext.Provider>
+    <KitStateContext.Provider value={stateValue}>
+      <KitActionsContext.Provider value={actions}>
+        {children}
+      </KitActionsContext.Provider>
+    </KitStateContext.Provider>
   );
 }
 
-export function useKit(): KitContextValue {
-  const ctx = useContext(KitContext);
-  if (!ctx) throw new Error('useKit must be used within KitProvider');
+export function useKitState(): KitState {
+  const ctx = useContext(KitStateContext);
+  if (!ctx) throw new Error('useKitState must be used within KitProvider');
   return ctx;
+}
+
+export function useKitActions(): KitActions {
+  const ctx = useContext(KitActionsContext);
+  if (!ctx) throw new Error('useKitActions must be used within KitProvider');
+  return ctx;
+}
+
+export function useKit(): KitContextValue {
+  const state = useKitState();
+  const actions = useKitActions();
+  return { ...state, ...actions };
 }

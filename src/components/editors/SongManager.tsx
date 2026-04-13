@@ -1,11 +1,11 @@
 import {useCallback} from 'react';
-import {useSaveFile} from '../../context/SaveFileContext';
+import {useSaveFileState, useSaveFileActions} from '../../context/SaveFileContext';
 import {SongInfo} from '../../services/binary/SaveFileProcessor';
 import './SongManager.css';
 
 export function SongManager() {
-  const { saveFileInfo, isLoading, error, selectedSongId,
-          loadSaveFile, exportSong, removeSong, exportSaveFile, importSong, selectSong } = useSaveFile();
+  const { saveFileInfo, isLoading, error, selectedSongId } = useSaveFileState();
+  const { loadSaveFile, exportSong, removeSong, exportSaveFile, importSong, selectSong } = useSaveFileActions();
 
   const handleRemoveSong = useCallback((songId: number) => {
     if (window.confirm(`Are you sure you want to remove song ${songId}?`)) {

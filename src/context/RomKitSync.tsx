@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useRom } from './RomContext';
-import { useKit } from './KitContext';
+import { useRomState, useRomActions } from './RomContext';
+import { useKitState, useKitActions } from './KitContext';
 import { SampleBankCompiler } from '../services/audio';
 import { serializedToSample } from '../utils/sample-serialization';
 
@@ -13,8 +13,10 @@ import { serializedToSample } from '../utils/sample-serialization';
  * Renders nothing — purely a side-effect component.
  */
 export function RomKitSync() {
-  const { romData, romInfo, romLoadGeneration, updateRomData } = useRom();
-  const { kitInfo, samples, useGbaPolarity, loadKitFromRomBank } = useKit();
+  const { romData, romInfo, romLoadGeneration } = useRomState();
+  const { updateRomData } = useRomActions();
+  const { kitInfo, samples, useGbaPolarity } = useKitState();
+  const { loadKitFromRomBank } = useKitActions();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Read romData via ref in the sync effect to avoid romData → updateRomData → romData loop
   const romDataRef = useRef(romData);
@@ -55,7 +57,6 @@ export function RomKitSync() {
 
     return () => clearTimeout(debounceRef.current);
   // romData intentionally excluded — read via romDataRef to prevent infinite loop
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kitInfo, samples, useGbaPolarity, updateRomData]);
 
   return null;

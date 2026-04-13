@@ -8,7 +8,7 @@ import { FontColor, FONT_CONSTANTS } from '../../types/font';
 import { FontProcessor } from '../../services/binary/FontProcessor';
 import { BinaryProcessor } from '../../services/binary';
 import { RomProcessor } from '../../services/binary';
-import { useRom } from '../../context/RomContext';
+import { useRomState } from '../../context/RomContext';
 import './FontEditor.css';
 
 /**
@@ -16,7 +16,7 @@ import './FontEditor.css';
  * Integrates TileEditor, FontMap, and ColorSelector components
  */
 export function FontEditor() {
-  const { romData, romInfo } = useRom();
+  const { romData, romInfo } = useRomState();
 
   // State for the font editor
   const [selectedFont, setSelectedFont] = useState(0);

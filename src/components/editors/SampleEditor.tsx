@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useKit } from '../../context/KitContext';
+import { useKitState, useKitActions } from '../../context/KitContext';
 import { SerializedSample, sampleToSerialized } from '../../utils/sample-serialization';
 import { SampleWaveform } from './SampleWaveform';
 import { SampleControls } from './sample-editor/SampleControls';
@@ -25,15 +25,15 @@ export function SampleEditor({
   isHalfSpeed,
   isLoading
 }: SampleEditorProps) {
+  const { tempRecordedSample } = useKitState();
   const {
-    tempRecordedSample,
     playSample: kitPlaySample,
     updateSampleVolume, updateSamplePitch, updateSampleTrim,
     updateSampleDither, updateSampleName, removeSample: kitRemoveSample,
     revertSample: kitRevertSample, replaceSample,
     deleteFrames, cropFrames, fadeInFrames, fadeOutFrames,
     getSampleInstance,
-  } = useKit();
+  } = useKitActions();
 
   // Local state for editable fields
   const [volumeDb, setVolumeDb] = useState(0);

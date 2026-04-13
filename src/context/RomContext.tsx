@@ -15,23 +15,30 @@ export interface ExportKitData {
   useGbaPolarity: boolean;
 }
 
-interface RomContextValue {
+export interface RomState {
   romInfo: RomInfo | null;
   romData: ArrayBuffer | null;
   /** Bumps only when a new ROM file is loaded (not when kit sync replaces the buffer). */
   romLoadGeneration: number;
   isLoading: boolean;
   error: string | null;
+}
+
+export interface RomActions {
   loadRomFile: () => Promise<void>;
   exportRomFile: (kitData: ExportKitData) => Promise<void>;
   updateRomData: (data: ArrayBuffer) => void;
 }
 
-const RomContext = createContext<RomContextValue | null>(null);
+type RomContextValue = RomState & RomActions;
+
+const RomStateContext = createContext<RomState | null>(null);
+const RomActionsContext = createContext<RomActions | null>(null);
 
 interface RomProviderProps {
   children: ReactNode;
-  initialState?: Partial<Pick<RomContextValue, 'romInfo' | 'romData' | 'isLoading' | 'error'>>;
+  // romLoadGeneration excluded: seeding it would incorrectly trigger the auto-load effect in RomKitSync
+  initialState?: Partial<Pick<RomState, 'romInfo' | 'romData' | 'isLoading' | 'error'>>;
 }
 
 export function RomProvider({ children, initialState }: RomProviderProps) {
@@ -93,20 +100,34 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
     }),
   }), [withLoading]);
 
-  const value = useMemo<RomContextValue>(
-    () => ({ romInfo, romData, romLoadGeneration, isLoading, error, ...actions }),
-    [romInfo, romData, romLoadGeneration, isLoading, error, actions]
+  const stateValue = useMemo<RomState>(
+    () => ({ romInfo, romData, romLoadGeneration, isLoading, error }),
+    [romInfo, romData, romLoadGeneration, isLoading, error]
   );
 
   return (
-    <RomContext.Provider value={value}>
-      {children}
-    </RomContext.Provider>
+    <RomStateContext.Provider value={stateValue}>
+      <RomActionsContext.Provider value={actions}>
+        {children}
+      </RomActionsContext.Provider>
+    </RomStateContext.Provider>
   );
 }
 
-export function useRom(): RomContextValue {
-  const ctx = useContext(RomContext);
-  if (!ctx) throw new Error('useRom must be used within RomProvider');
+export function useRomState(): RomState {
+  const ctx = useContext(RomStateContext);
+  if (!ctx) throw new Error('useRomState must be used within RomProvider');
   return ctx;
+}
+
+export function useRomActions(): RomActions {
+  const ctx = useContext(RomActionsContext);
+  if (!ctx) throw new Error('useRomActions must be used within RomProvider');
+  return ctx;
+}
+
+export function useRom(): RomContextValue {
+  const state = useRomState();
+  const actions = useRomActions();
+  return { ...state, ...actions };
 }

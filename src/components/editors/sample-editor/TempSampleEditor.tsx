@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useKit } from '../../../context/KitContext';
+import { useKitState, useKitActions } from '../../../context/KitContext';
 import { SerializedSample, serializedToSample, sampleToSerialized } from '../../../utils/sample-serialization';
 import { SampleWaveform } from '../SampleWaveform';
 import { AudioService } from '../../../services/audio';
@@ -19,12 +19,8 @@ export function TempSampleEditor({
   isHalfSpeed,
   isLoading,
 }: TempSampleEditorProps) {
-  const {
-    kitInfo,
-    updateTempRecordedSample,
-    saveTempSampleToKit,
-    clearTempRecordedSample,
-  } = useKit();
+  const { kitInfo } = useKitState();
+  const { updateTempRecordedSample, saveTempSampleToKit, clearTempRecordedSample } = useKitActions();
 
   const [selection, setSelection] = useState<{ startFrame: number; endFrame: number } | null>(null);
 
