@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
-import { FontColor } from '../../types/font';
+import { FontColor, fontColorToCss } from '../../types/font';
+import './TileEditor.css';
 
 interface TileEditorProps {
   tileData: number[][];
@@ -44,7 +45,7 @@ export function TileEditor({
     for (let y = 0; y < 8; y++) {
       for (let x = 0; x < 8; x++) {
         const color = tileData[y][x];
-        ctx.fillStyle = getColorForValue(color);
+        ctx.fillStyle = fontColorToCss(color);
         ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
       }
     }
@@ -84,17 +85,6 @@ export function TileEditor({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Convert a color value to a CSS color string
-  function getColorForValue(value: number): string {
-    switch (value) {
-      case 0: return 'white';
-      case 1: return 'lightgray';
-      case 2: return 'darkgray';
-      case 3: return 'black';
-      default: return 'white';
-    }
-  }
 
   // Handle mouse down event
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -175,26 +165,6 @@ export function TileEditor({
         role="img"
         aria-label="Font tile editor"
       />
-
-      <style>{`
-        .tile-editor {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background-color: var(--gb-darkest);
-          border: 4px solid var(--gb-light);
-          padding: 1rem;
-          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .tile-editor canvas {
-          image-rendering: pixelated;
-          image-rendering: crisp-edges;
-          cursor: crosshair;
-          max-width: 100%;
-          max-height: 100%;
-        }
-      `}</style>
     </div>
   );
 }

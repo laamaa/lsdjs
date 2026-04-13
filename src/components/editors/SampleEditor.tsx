@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useKitState, useKitActions } from '../../context/KitContext';
 import { Sample } from '../../services/audio';
 import { SampleWaveform } from './SampleWaveform';
@@ -35,34 +35,25 @@ export function SampleEditor({
     getSampleInstance,
   } = useKitActions();
 
-  const [maxTrim, setMaxTrim] = useState(0);
-  const [sampleData, setSampleData] = useState<Uint8Array | null>(null);
-  const [sampleDuration, setSampleDuration] = useState(0);
   const [selection, setSelection] = useState<{ startFrame: number; endFrame: number } | null>(null);
 
   const [isApplyingPitchShift, setIsApplyingPitchShift] = useState(false);
-  const currentPitchRef = useRef(0);
+  const [displayPitch, setDisplayPitch] = useState(0);
 
   // Compute derived values from sample instance
-  useEffect(() => {
+  const { maxTrim, sampleData, sampleDuration } = useMemo(() => {
     if (selectedSampleIndex !== null && samples[selectedSampleIndex]) {
       const s = samples[selectedSampleIndex]!;
-
-      if (!isApplyingPitchShift) {
-        currentPitchRef.current = s.getPitchSemitones();
-      }
-
-      setMaxTrim(Math.max(0, Math.floor(s.untrimmedLengthInSamples() / 32) - 1));
+      const trim = Math.max(0, Math.floor(s.untrimmedLengthInSamples() / 32) - 1);
       const int16Data = s.workSampleData();
-      setSampleData(convertSampleDataForWaveform(int16Data));
-      setSampleDuration(calculateSampleDuration(int16Data.length, isHalfSpeed));
-    } else {
-      setMaxTrim(0);
-      setSampleData(null);
-      setSampleDuration(0);
-      currentPitchRef.current = 0;
+      return {
+        maxTrim: trim,
+        sampleData: convertSampleDataForWaveform(int16Data),
+        sampleDuration: calculateSampleDuration(int16Data.length, isHalfSpeed),
+      };
     }
-  }, [selectedSampleIndex, samples, isHalfSpeed, isApplyingPitchShift]);
+    return { maxTrim: 0, sampleData: null as Uint8Array | null, sampleDuration: 0 };
+  }, [selectedSampleIndex, samples, isHalfSpeed]);
 
   const handleUpdateSampleVolume = useCallback((value: number) => {
     if (selectedSampleIndex !== null) {
@@ -72,7 +63,7 @@ export function SampleEditor({
 
   const handleUpdateSamplePitch = useCallback(async (value: number) => {
     if (selectedSampleIndex !== null) {
-      currentPitchRef.current = value;
+      setDisplayPitch(value);
       updateSamplePitch(selectedSampleIndex, value);
       setIsApplyingPitchShift(true);
 
@@ -180,7 +171,7 @@ export function SampleEditor({
       <SampleControls
         canAdjustVolume={s.canAdjustVolume()}
         volumeDb={s.getVolumeDb()}
-        pitchSemitones={isApplyingPitchShift ? currentPitchRef.current : s.getPitchSemitones()}
+        pitchSemitones={isApplyingPitchShift ? displayPitch : s.getPitchSemitones()}
         trim={s.getTrim()}
         dither={s.getDither()}
         maxTrim={maxTrim}

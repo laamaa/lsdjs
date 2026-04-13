@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { FONT_CONSTANTS } from '../../types/font';
+import { FONT_CONSTANTS, fontColorToCss } from '../../types/font';
+import './FontMap.css';
 
 interface FontMapProps {
   fontData: number[][][];
@@ -47,17 +48,6 @@ export function FontMap({
     return fontData[tileIndex];
   }, [fontData]);
 
-  // Convert a color value to a CSS color string
-  const getColorForValue = (value: number): string => {
-    switch (value) {
-      case 0: return 'white';
-      case 1: return 'lightgray';
-      case 2: return 'darkgray';
-      case 3: return 'black';
-      default: return 'white';
-    }
-  };
-
   // Draw the font map on the canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -99,7 +89,7 @@ export function FontMap({
       for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
           const color = tileData[row][col];
-          ctx.fillStyle = getColorForValue(color);
+          ctx.fillStyle = fontColorToCss(color);
           ctx.fillRect(
             x + col * newZoom, 
             y + row * newZoom, 
@@ -179,29 +169,6 @@ export function FontMap({
         role="grid"
         aria-label="Font character map"
       />
-
-      <style>{`
-        .font-map {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background-color: var(--gb-darkest);
-          border: 4px solid var(--gb-light);
-          padding: 0.5rem;
-          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
-          width: 100%;
-          height: 100%;
-          min-height: 200px;
-        }
-
-        .font-map canvas {
-          image-rendering: pixelated;
-          image-rendering: crisp-edges;
-          cursor: pointer;
-          max-width: 100%;
-          max-height: 100%;
-        }
-      `}</style>
     </div>
   );
 }

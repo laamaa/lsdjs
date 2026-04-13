@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRomState } from '../../context/RomContext';
 import { useKitState, useKitActions } from '../../context/KitContext';
 import { SampleEditor } from './SampleEditor';
@@ -18,16 +18,14 @@ export function KitEditor() {
     loadKitFromFile, loadKitFromRomBank, saveKitToFile,
   } = useKitActions();
 
-  const [kitName, setKitName] = useState('');
+  const [kitName, setKitName] = useState(kitInfo?.name ?? '');
   const [showPreferences, setShowPreferences] = useState(false);
+  const [prevKitInfo, setPrevKitInfo] = useState(kitInfo);
 
-  useEffect(() => {
-    if (kitInfo) {
-      setKitName(kitInfo.name);
-    } else {
-      setKitName('');
-    }
-  }, [kitInfo]);
+  if (prevKitInfo !== kitInfo) {
+    setPrevKitInfo(kitInfo);
+    setKitName(kitInfo?.name ?? '');
+  }
 
   const handleLoadKitFromFile = useCallback(() => {
     if (romData) loadKitFromFile(romData);

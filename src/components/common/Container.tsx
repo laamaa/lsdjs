@@ -1,4 +1,5 @@
 import {ReactNode} from 'react';
+import './Container.css';
 
 interface ContainerProps {
   children: ReactNode;
@@ -17,22 +18,6 @@ export function Container({ children, className = '' }: ContainerProps) {
       aria-label="Content container"
     >
       {children}
-
-      <style>{`
-        .container {
-          width: 100%;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 1rem;
-          box-sizing: border-box;
-        }
-
-        @media (min-width: 768px) {
-          .container {
-            padding: 2rem;
-          }
-        }
-      `}</style>
     </div>
   );
 }

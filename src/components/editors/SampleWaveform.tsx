@@ -88,12 +88,15 @@ export function SampleWaveform({
   const ARROW_KEY_FRAME_INCREMENT = 64;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [containerWidth, setContainerWidth] = useState(width || 300);
+  const [observedWidth, setObservedWidth] = useState(300);
 
   // Selection state
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<number | null>(selection ? selection.startFrame : null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(selection ? selection.endFrame : null);
+
+  // Derive effective width: explicit prop takes priority over observed
+  const containerWidth = width ?? observedWidth;
 
   // Use theme colors if not explicitly provided via props
   const themeColor = color || 'var(--gb-highlight)';
@@ -101,11 +104,8 @@ export function SampleWaveform({
 
   // Set up ResizeObserver to track container width changes
   useEffect(() => {
-    // If width is explicitly provided, use that
-    if (width) {
-      setContainerWidth(width);
-      return;
-    }
+    // If width is explicitly provided, no need to observe
+    if (width) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -118,20 +118,20 @@ export function SampleWaveform({
         for (const entry of entries) {
           // Use contentBoxSize if available (newer browsers)
           if (entry.contentBoxSize) {
-            const contentBoxSize = Array.isArray(entry.contentBoxSize) 
-              ? entry.contentBoxSize[0] 
+            const contentBoxSize = Array.isArray(entry.contentBoxSize)
+              ? entry.contentBoxSize[0]
               : entry.contentBoxSize;
 
             // Access inlineSize property
             const newWidth = contentBoxSize.inlineSize as number;
             if (newWidth > 0) {
-              setContainerWidth(newWidth);
+              setObservedWidth(newWidth);
             }
           } else {
             // Fallback to contentRect for older browsers
             const newWidth = entry.contentRect.width;
             if (newWidth > 0) {
-              setContainerWidth(newWidth);
+              setObservedWidth(newWidth);
             }
           }
         }
@@ -143,7 +143,7 @@ export function SampleWaveform({
       // Initial measurement
       const initialWidth = container.clientWidth;
       if (initialWidth > 0) {
-        setContainerWidth(initialWidth);
+        setObservedWidth(initialWidth);
       }
     } catch (error) {
       console.error('Error setting up ResizeObserver:', error);
@@ -152,7 +152,7 @@ export function SampleWaveform({
         if (container) {
           const newWidth = container.clientWidth;
           if (newWidth > 0) {
-            setContainerWidth(newWidth);
+            setObservedWidth(newWidth);
           }
         }
       };
@@ -175,13 +175,10 @@ export function SampleWaveform({
     };
   }, [width]);
 
-  // We no longer reset selection when data changes
-  // This allows selections to persist when adjusting sample parameters
-  // The selection will only be cleared when explicitly requested
-  // or when the component unmounts
-
-  // Update internal selection state when selection prop changes
-  useEffect(() => {
+  // Sync internal selection state when the controlled selection prop changes
+  const [prevSelection, setPrevSelection] = useState(selection);
+  if (prevSelection !== selection) {
+    setPrevSelection(selection);
     if (selection === null) {
       setSelectionStart(null);
       setSelectionEnd(null);
@@ -189,7 +186,7 @@ export function SampleWaveform({
       setSelectionStart(selection.startFrame);
       setSelectionEnd(selection.endFrame);
     }
-  }, [selection]);
+  }
 
   // Generate the SVG path for the waveform
   const generateWaveformPath = useCallback((): string => {

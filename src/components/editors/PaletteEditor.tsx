@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { DropdownSelector } from '../common/DropdownSelector';
 import { ColorPicker } from './ColorPicker';
 import { SwatchPanel } from './SwatchPanel';
@@ -26,30 +26,29 @@ export function PaletteEditor() {
   const [selectedColor, setSelectedColor] = useState<RGB555>({ r: 0, g: 0, b: 0 });
   const [colorSpaceMode, setColorSpaceMode] = useState<'modern' | 'gbc' | 'desaturated'>('modern');
 
-  // Initialize the palette processor when ROM data is available
-  useEffect(() => {
-    if (!romData || !romInfo?.hasPalettes) return;
+  // Initialize the palette processor when ROM data changes
+  const [prevRomData, setPrevRomData] = useState(romData);
+  if (prevRomData !== romData) {
+    setPrevRomData(romData);
+    if (romData && romInfo?.hasPalettes) {
+      try {
+        const processor = new PaletteProcessor(romData);
+        setPaletteProcessor(processor);
 
-    try {
-      const processor = new PaletteProcessor(romData);
-      setPaletteProcessor(processor);
+        const names = processor.getPaletteNames();
+        setPaletteNames(names);
 
-      // Load palette names
-      const names = processor.getPaletteNames();
-      setPaletteNames(names);
+        const firstPalette = processor.getPalette(0);
+        setPalette(firstPalette);
 
-      // Load the first palette
-      const firstPalette = processor.getPalette(0);
-      setPalette(firstPalette);
-
-      // Select the first color by default
-      setSelectedColorSet(0);
-      setSelectedIsBackground(true);
-      setSelectedColor(firstPalette.normal.background);
-    } catch (error) {
-      console.error('Error initializing palette processor:', error);
+        setSelectedColorSet(0);
+        setSelectedIsBackground(true);
+        setSelectedColor(firstPalette.normal.background);
+      } catch (error) {
+        console.error('Error initializing palette processor:', error);
+      }
     }
-  }, [romData, romInfo]);
+  }
 
   // Helper function to get a color set by index
   const getColorSetByIndex = useCallback((palette: Palette, index: number): ColorSet => {

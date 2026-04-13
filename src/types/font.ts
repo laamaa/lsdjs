@@ -20,8 +20,18 @@ export const FONT_CONSTANTS = {
   GFX_SIZE: 16 * 46
 };
 
-// Font color type (1-3)
+// Font color type (0-3)
 export type FontColor = 0 | 1 | 2 | 3;
+
+export function fontColorToCss(value: number): string {
+  switch (value) {
+    case 0: return 'white';
+    case 1: return 'lightgray';
+    case 2: return 'darkgray';
+    case 3: return 'black';
+    default: return 'white';
+  }
+}
 
 // Interface for a font tile
 export interface FontTile {

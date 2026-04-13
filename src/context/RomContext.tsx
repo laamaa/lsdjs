@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, useRef, useEffect, ReactNode } from 'react';
 import { FileService } from '../services/file/FileService';
 import { RomProcessor, RomInfo as BaseRomInfo } from '../services/binary';
 import { SampleBankCompiler, Sample } from '../services/audio';
@@ -51,7 +51,9 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
   );
 
   const stateRef = useRef({ romInfo, romData });
-  stateRef.current = { romInfo, romData };
+  useEffect(() => {
+    stateRef.current = { romInfo, romData };
+  });
 
   const actions = useMemo(() => ({
     updateRomData: (data: ArrayBuffer) => setRomData(data),
@@ -98,7 +100,7 @@ export function RomProvider({ children, initialState }: RomProviderProps) {
         mimeType: 'application/octet-stream',
       });
     }),
-  }), [withLoading]);
+  }), [withLoading, setError]);
 
   const stateValue = useMemo<RomState>(
     () => ({ romInfo, romData, romLoadGeneration, isLoading, error }),

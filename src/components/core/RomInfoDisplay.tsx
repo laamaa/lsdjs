@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useId, useState} from 'react';
 import {useRomState, useRomActions} from '../../context/RomContext';
 import {useKitState} from '../../context/KitContext';
 import './RomInfoDisplay.css';
@@ -13,6 +13,7 @@ export function RomInfoDisplay() {
   const kit = useKitState();
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const mainHeadingId = useId();
 
   function handleFileSelect() {
     loadRomFile();
@@ -25,8 +26,6 @@ export function RomInfoDisplay() {
   function handleToggleExpand() {
     setIsExpanded(!isExpanded);
   }
-
-  const mainHeadingId = `rom-info-heading-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
     <div className="rom-info-container" role="region" aria-labelledby={mainHeadingId}>

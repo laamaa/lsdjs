@@ -1,4 +1,4 @@
-import {useCallback} from 'react';
+import {useCallback, useId} from 'react';
 import {useSaveFileState, useSaveFileActions} from '../../context/SaveFileContext';
 import {SongInfo} from '../../services/binary/SaveFileProcessor';
 import './SongManager.css';
@@ -6,6 +6,9 @@ import './SongManager.css';
 export function SongManager() {
   const { saveFileInfo, isLoading, error, selectedSongId } = useSaveFileState();
   const { loadSaveFile, exportSong, removeSong, exportSaveFile, importSong, selectSong } = useSaveFileActions();
+
+  const memoryBarId = useId();
+  const songListId = useId();
 
   const handleRemoveSong = useCallback((songId: number) => {
     if (window.confirm(`Are you sure you want to remove song ${songId}?`)) {
@@ -18,7 +21,6 @@ export function SongManager() {
 
     const { totalBlocks, usedBlocks, freeBlocks } = saveFileInfo;
     const usedPercentage = Math.round((usedBlocks / totalBlocks) * 100);
-    const memoryBarId = `memory-bar-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
       <div className="memory-usage" role="region" aria-labelledby="memory-usage-title">
@@ -53,8 +55,6 @@ export function SongManager() {
     if (!saveFileInfo || saveFileInfo.songs.length === 0) {
       return <p>No songs found in this save file.</p>;
     }
-
-    const songListId = `song-list-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
       <div className="song-list" role="region" aria-labelledby={songListId}>

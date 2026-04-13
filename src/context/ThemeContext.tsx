@@ -89,7 +89,10 @@ interface ThemeProviderProps {
 
 // Create the theme provider component
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [currentPalette, setCurrentPalette] = useState<PaletteType>('snes');
+  const [currentPalette, setCurrentPalette] = useState<PaletteType>(() => {
+    const saved = localStorage.getItem('lsdpatcher-palette') as PaletteType | null;
+    return saved && palettes[saved] ? saved : 'snes';
+  });
   const availablePalettes = Object.keys(palettes) as PaletteType[];
 
   // Apply the palette to CSS variables
@@ -111,13 +114,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     localStorage.setItem('lsdpatcher-palette', palette);
   };
 
-  // Load the palette from localStorage on mount
-  useEffect(() => {
-    const savedPalette = localStorage.getItem('lsdpatcher-palette') as PaletteType | null;
-    if (savedPalette && palettes[savedPalette]) {
-      setCurrentPalette(savedPalette);
-    }
-  }, []);
 
   return (
     <ThemeContext.Provider value={{ currentPalette, setPalette, availablePalettes }}>

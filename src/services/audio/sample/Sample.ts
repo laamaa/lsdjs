@@ -133,6 +133,9 @@ export class Sample {
    * Reads the next sample value
    */
   public read(): number {
+    if (this.readPos >= this.processedSamples.length) {
+      return 0;
+    }
     return this.processedSamples[this.readPos++];
   }
 

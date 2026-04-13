@@ -1,0 +1,207 @@
+.audio-test-container {
+  padding: 0.75rem;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .audio-test-container {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}
+
+.audio-test-container h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 0 var(--gb-darkest);
+  color: var(--gb-lightest);
+}
+
+.audio-test-container h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gb-lightest);
+}
+
+.audio-test-container .control-group {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--gb-darkest);
+  border: 3px solid var(--gb-light);
+  padding: 0.75rem;
+  position: relative;
+}
+
+.audio-test-container .control-group::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(155, 188, 15, 0.03),
+    rgba(155, 188, 15, 0.03) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+@media (min-width: 768px) {
+  .audio-test-container .control-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.audio-test-container label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gb-lightest);
+  position: relative;
+  z-index: 2;
+}
+
+.audio-test-container input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 20px;
+  background-color: var(--gb-dark);
+  border: 3px solid var(--gb-light);
+  margin: 0.5rem 0;
+  position: relative;
+  z-index: 2;
+}
+
+.audio-test-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background-color: var(--gb-lightest);
+  border: 2px solid var(--gb-dark);
+  cursor: pointer;
+}
+
+.audio-test-container input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background-color: var(--gb-lightest);
+  border: 2px solid var(--gb-dark);
+  cursor: pointer;
+}
+
+.audio-test-container .value-display {
+  width: 100%;
+  text-align: right;
+  font-size: 0.7rem;
+  color: var(--gb-lightest);
+  margin-top: 0.25rem;
+  font-family: 'Press Start 2P', cursive;
+  position: relative;
+  z-index: 2;
+}
+
+.audio-test-container .button-group {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.audio-test-container button {
+  padding: 0.75rem;
+  border: 4px solid var(--gb-light);
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  font-family: 'Press Start 2P', cursive;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--gb-darkest);
+  transition: all 0.1s;
+}
+
+.audio-test-container button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 6px 6px 0 var(--gb-darkest);
+}
+
+.audio-test-container button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 2px 2px 0 var(--gb-darkest);
+}
+
+.audio-test-container .play-button {
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  flex: 1;
+}
+
+.audio-test-container .play-button:hover:not(:disabled) {
+  background-color: var(--gb-light);
+  color: var(--gb-darkest);
+}
+
+.audio-test-container .stop-button {
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  border-style: dashed;
+  flex: 1;
+}
+
+.audio-test-container .stop-button:hover:not(:disabled) {
+  background-color: var(--gb-light);
+  color: var(--gb-darkest);
+}
+
+.audio-test-container button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.audio-test-container .preset-buttons {
+  margin-top: 1.5rem;
+  border-top: 3px solid var(--gb-light);
+  padding-top: 1rem;
+}
+
+.audio-test-container .preset-button {
+  background-color: var(--gb-darkest);
+  color: var(--gb-lightest);
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.6rem;
+}
+
+.audio-test-container .preset-button:hover:not(:disabled) {
+  background-color: var(--gb-light);
+  color: var(--gb-darkest);
+}
+
+.audio-test-container .error-message {
+  padding: 0.75rem;
+  background-color: var(--gb-dark);
+  color: var(--gb-lightest);
+  border: 4px dashed var(--gb-light);
+  margin-top: 1.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}

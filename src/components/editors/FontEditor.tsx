@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '../common';
 import { TileEditor } from './TileEditor';
 import { FontMap } from './FontMap';
@@ -10,6 +10,37 @@ import { BinaryProcessor } from '../../services/binary';
 import { RomProcessor } from '../../services/binary';
 import { useRomState } from '../../context/RomContext';
 import './FontEditor.css';
+
+// Pure helper functions for ROM font data access
+function findFontOffset(romData: ArrayBuffer): number {
+  const processor = new BinaryProcessor(romData);
+  return RomProcessor.findFontOffset(processor);
+}
+
+function findGfxFontOffset(romData: ArrayBuffer): number {
+  const processor = new BinaryProcessor(romData);
+  return RomProcessor.findGfxFontOffset(processor);
+}
+
+function loadFontNames(romData: ArrayBuffer): string[] {
+  const processor = new BinaryProcessor(romData);
+  const nameOffset = RomProcessor.findFontNameOffset(processor);
+
+  if (nameOffset === -1) {
+    console.error('Could not find font name offset in ROM');
+    return ['FONT1', 'FONT2', 'FONT3'];
+  }
+
+  const names: string[] = [];
+  const fontNameSize = 5;
+
+  for (let i = 0; i < FONT_CONSTANTS.FONT_COUNT; i++) {
+    const name = processor.readAsciiString(nameOffset + i * fontNameSize, FONT_CONSTANTS.FONT_NAME_LENGTH);
+    names.push(name || `FONT${i + 1}`);
+  }
+
+  return names;
+}
 
 /**
  * FontEditor component for editing font data in ROM files
@@ -53,80 +84,31 @@ export function FontEditor() {
     setFontData(data);
   }, [showGfxCharacters]);
 
-  // Initialize the font processor when ROM data is available or showGfxCharacters changes
-  useEffect(() => {
-    if (!romData || !romInfo?.hasFonts) return;
+  // Initialize the font processor when ROM data or showGfxCharacters changes
+  const [prevInitKey, setPrevInitKey] = useState<string | null>(null);
+  const initKey = romData && romInfo?.hasFonts ? `${romInfo.size}-${showGfxCharacters}` : null;
 
-    // Find font and graphics font offsets
-    const fontOffset = findFontOffset(romData);
-    const gfxFontOffset = findGfxFontOffset(romData);
+  if (initKey !== prevInitKey) {
+    setPrevInitKey(initKey);
+    if (romData && romInfo?.hasFonts) {
+      const fontOffset = findFontOffset(romData);
+      const gfxFontOffset = findGfxFontOffset(romData);
 
-    if (fontOffset === -1 || gfxFontOffset === -1) {
-      console.error('Could not find font data in ROM');
-      return;
+      if (fontOffset !== -1 && gfxFontOffset !== -1) {
+        const names = loadFontNames(romData);
+        setFontNames(names);
+
+        const adjustedIndex = (1) % FONT_CONSTANTS.FONT_COUNT;
+        const firstFontOffset = fontOffset + adjustedIndex * FONT_CONSTANTS.FONT_SIZE + FONT_CONSTANTS.FONT_HEADER_SIZE;
+
+        const processor = new FontProcessor(romData, firstFontOffset, gfxFontOffset);
+        setFontProcessor(processor);
+        loadFontData(processor);
+        setSelectedTile(0);
+      }
     }
+  }
 
-    // Load font names
-    const names = loadFontNames(romData);
-    setFontNames(names);
-
-    // Calculate the offset for the first font (index 0)
-    // In the Java implementation, fonts are defined in reverse order
-    // and we need to adjust the index: (index + 1) % 3
-    const adjustedIndex = (1) % FONT_CONSTANTS.FONT_COUNT;
-    const firstFontOffset = fontOffset + adjustedIndex * FONT_CONSTANTS.FONT_SIZE + FONT_CONSTANTS.FONT_HEADER_SIZE;
-
-    // Create a new font processor for the first font
-    const processor = new FontProcessor(romData, firstFontOffset, gfxFontOffset);
-    setFontProcessor(processor);
-
-    // Load initial font data
-    loadFontData(processor);
-  }, [romData, romInfo, showGfxCharacters, loadFontData]);
-
-  // Ensure the first tile is selected after font data is loaded
-  // This is especially important for mobile Safari where the initial selection might not be displayed
-  useEffect(() => {
-    if (fontData.length > 0) {
-      // Explicitly set the selected tile to ensure it's displayed
-      setSelectedTile(0);
-    }
-  }, [fontData]);
-
-
-  // Find the font offset in the ROM
-  const findFontOffset = (romData: ArrayBuffer): number => {
-    const processor = new BinaryProcessor(romData);
-    return RomProcessor.findFontOffset(processor);
-  };
-
-  // Find the graphics font offset in the ROM
-  const findGfxFontOffset = (romData: ArrayBuffer): number => {
-    const processor = new BinaryProcessor(romData);
-    return RomProcessor.findGfxFontOffset(processor);
-  };
-
-  // Load font names from the ROM
-  const loadFontNames = (romData: ArrayBuffer): string[] => {
-    const processor = new BinaryProcessor(romData);
-    const nameOffset = RomProcessor.findFontNameOffset(processor);
-
-    if (nameOffset === -1) {
-      console.error('Could not find font name offset in ROM');
-      return ['FONT1', 'FONT2', 'FONT3']; // Fallback to placeholder names
-    }
-
-    const names: string[] = [];
-    const fontNameSize = 5; // Each font name is 5 bytes (4 chars + 1 separator)
-
-    // Read font names from the ROM
-    for (let i = 0; i < FONT_CONSTANTS.FONT_COUNT; i++) {
-      const name = processor.readAsciiString(nameOffset + i * fontNameSize, FONT_CONSTANTS.FONT_NAME_LENGTH);
-      names.push(name || `FONT${i + 1}`); // Use a default name if the read fails
-    }
-
-    return names;
-  };
 
   // Handle tile selection
   const handleTileSelect = (tileIndex: number) => {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, useRef, useEffect, ReactNode } from 'react';
 import { FileService } from '../services/file/FileService';
 import { Sample, SampleBankCompiler, AudioService } from '../services/audio';
 import { useLoadingState } from './useLoadingState';
@@ -90,7 +90,9 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
   const fileMapRef = useRef<Map<number, File>>(new Map());
 
   const stateRef = useRef({ kitInfo, samples, selectedSampleIndex, selectedBankIndex, isHalfSpeed, useGbaPolarity, tempRecordedSample });
-  stateRef.current = { kitInfo, samples, selectedSampleIndex, selectedBankIndex, isHalfSpeed, useGbaPolarity, tempRecordedSample };
+  useEffect(() => {
+    stateRef.current = { kitInfo, samples, selectedSampleIndex, selectedBankIndex, isHalfSpeed, useGbaPolarity, tempRecordedSample };
+  });
 
   function updateSampleAt(index: number, mutator: (s: Sample) => void) {
     const s = stateRef.current.samples[index];
@@ -108,6 +110,14 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
   function replaceSampleAt(index: number, sample: Sample) {
     const newSamples = [...stateRef.current.samples];
     newSamples[index] = sample;
+
+    // Keep fileMapRef in sync with the sample's file reference
+    const file = sample.getFile();
+    if (file) {
+      fileMapRef.current.set(index, file);
+    } else {
+      fileMapRef.current.delete(index);
+    }
 
     setSamples(newSamples);
     const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(newSamples);
@@ -264,16 +274,14 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         fileMapRef.current.clear();
       }),
 
-    loadKitFromFile: (romData: ArrayBuffer): Promise<ArrayBuffer | null> => {
-      // Returns updated romData if successful, null otherwise
-      let result: ArrayBuffer | null = null;
-      return withLoading('Failed to load kit file', async () => {
+    loadKitFromFile: async (romData: ArrayBuffer): Promise<ArrayBuffer | null> => {
+      const result = await withLoading('Failed to load kit file', async () => {
         const fileData = await FileService.loadBinaryFile('.kit');
-        if (!fileData) return;
+        if (!fileData) return null;
 
         if (!SampleBankCompiler.isKitBank(fileData)) {
           setError('Invalid kit file format');
-          return;
+          return null;
         }
 
         const { selectedBankIndex: bankIdx } = stateRef.current;
@@ -294,8 +302,9 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         });
         setSelectedSampleIndex(null);
         fileMapRef.current.clear();
-        result = newRomData;
-      }).then(() => result);
+        return newRomData;
+      });
+      return result ?? null;
     },
 
     saveKitToFile: (romData: ArrayBuffer) =>

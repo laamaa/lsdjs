@@ -28,6 +28,7 @@ export function DropdownSelector({
 }: DropdownSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [editableName, setEditableName] = useState(options[selectedIndex] || '');
+  const [prevSelectedIndex, setPrevSelectedIndex] = useState(selectedIndex);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -36,12 +37,13 @@ export function DropdownSelector({
     return index.toString().padStart(2, '0');
   };
 
-  // Update editable name when selected option changes
-  useEffect(() => {
+  // Update editable name when selected option changes externally
+  if (prevSelectedIndex !== selectedIndex) {
+    setPrevSelectedIndex(selectedIndex);
     if (editable && options[selectedIndex]) {
       setEditableName(options[selectedIndex]);
     }
-  }, [selectedIndex, options, editable]);
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {

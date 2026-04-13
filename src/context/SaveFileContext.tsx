@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, useRef, useEffect, ReactNode } from 'react';
 import { FileService } from '../services/file/FileService';
 import { SaveFileInfo, SaveFileProcessor } from '../services/binary/SaveFileProcessor';
 import { BinaryProcessor } from '../services/binary';
@@ -41,7 +41,9 @@ export function SaveFileProvider({ children, initialState }: SaveFileProviderPro
 
   // Ref holds latest state for stable action closures
   const stateRef = useRef({ saveFileInfo, saveFileData, selectedSongId });
-  stateRef.current = { saveFileInfo, saveFileData, selectedSongId };
+  useEffect(() => {
+    stateRef.current = { saveFileInfo, saveFileData, selectedSongId };
+  });
 
   const actions = useMemo<SaveFileActions>(() => ({
     selectSong: (songId: number | null) => setSelectedSongId(songId),
@@ -92,11 +94,13 @@ export function SaveFileProvider({ children, initialState }: SaveFileProviderPro
       const song = info.songs.find(s => s.id === songId);
       if (!song) return;
 
-      const processor = new BinaryProcessor(data);
+      const clonedData = data.slice(0);
+      const processor = new BinaryProcessor(clonedData);
       SaveFileProcessor.clearSong(processor, songId);
 
-      const updatedInfo = SaveFileProcessor.parseSaveFile(data);
+      const updatedInfo = SaveFileProcessor.parseSaveFile(clonedData);
       setSaveFileInfo(updatedInfo);
+      setSaveFileData(clonedData);
 
       if (selected === songId) {
         setSelectedSongId(null);
@@ -110,18 +114,20 @@ export function SaveFileProvider({ children, initialState }: SaveFileProviderPro
       const songData = await FileService.loadBinaryFile('.lsdprj');
       if (!songData) return;
 
-      const processor = new BinaryProcessor(data);
+      const clonedData = data.slice(0);
+      const processor = new BinaryProcessor(clonedData);
       const songId = SaveFileProcessor.importSongFromLsdprj(processor, songData);
       if (songId === null) {
         setError('Failed to import song');
         return;
       }
 
-      const updatedInfo = SaveFileProcessor.parseSaveFile(data);
+      const updatedInfo = SaveFileProcessor.parseSaveFile(clonedData);
       setSaveFileInfo(updatedInfo);
+      setSaveFileData(clonedData);
       setSelectedSongId(songId);
     }),
-  }), [withLoading]);
+  }), [withLoading, setError]);
 
   const stateValue = useMemo<SaveFileState>(
     () => ({ saveFileInfo, selectedSongId, isLoading, error }),

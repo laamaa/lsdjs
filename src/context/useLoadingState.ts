@@ -8,13 +8,14 @@ export function useLoadingState(initialLoading = false, initialError: string | n
   const [isLoading, setIsLoading] = useState(initialLoading);
   const [error, setError] = useState<string | null>(initialError);
 
-  const withLoading = useCallback(async (errorLabel: string, fn: () => Promise<void>) => {
+  const withLoading = useCallback(async <T = void>(errorLabel: string, fn: () => Promise<T>): Promise<T | undefined> => {
     setIsLoading(true);
     setError(null);
     try {
-      await fn();
+      return await fn();
     } catch (e) {
       setError(e instanceof Error ? e.message : errorLabel);
+      return undefined;
     } finally {
       setIsLoading(false);
     }
