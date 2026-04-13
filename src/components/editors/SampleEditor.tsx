@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useKitState, useKitActions } from '../../context/KitContext';
 import { Sample } from '../../services/audio';
 import { SampleWaveform } from './SampleWaveform';
@@ -35,72 +35,43 @@ export function SampleEditor({
     getSampleInstance,
   } = useKitActions();
 
-  // Local state for editable fields
-  const [volumeDb, setVolumeDb] = useState(0);
-  const [pitchSemitones, setPitchSemitones] = useState(0);
-  const [trim, setTrim] = useState(0);
-  const [dither, setDither] = useState(false);
   const [maxTrim, setMaxTrim] = useState(0);
   const [sampleData, setSampleData] = useState<Uint8Array | null>(null);
   const [sampleDuration, setSampleDuration] = useState(0);
   const [selection, setSelection] = useState<{ startFrame: number; endFrame: number } | null>(null);
-  const [sampleName, setSampleName] = useState("");
 
   const [isApplyingPitchShift, setIsApplyingPitchShift] = useState(false);
-  const currentPitchRef = React.useRef(0);
-  const isUserUpdate = React.useRef(false);
+  const currentPitchRef = useRef(0);
 
-  // Sync local state from sample instance
+  // Compute derived values from sample instance
   useEffect(() => {
     if (selectedSampleIndex !== null && samples[selectedSampleIndex]) {
       const s = samples[selectedSampleIndex]!;
 
-      // Only sync control values from context when not a user-initiated update
-      if (!isUserUpdate.current) {
-        setVolumeDb(s.getVolumeDb());
-        if (!isApplyingPitchShift) {
-          setPitchSemitones(s.getPitchSemitones());
-        }
-        setTrim(s.getTrim());
-        setDither(s.getDither());
-        setSampleName(s.getName());
+      if (!isApplyingPitchShift) {
+        currentPitchRef.current = s.getPitchSemitones();
       }
 
-      const untrimmedLength = s.untrimmedLengthInSamples();
-      setMaxTrim(Math.max(0, Math.floor(untrimmedLength / 32) - 1));
-
+      setMaxTrim(Math.max(0, Math.floor(s.untrimmedLengthInSamples() / 32) - 1));
       const int16Data = s.workSampleData();
       setSampleData(convertSampleDataForWaveform(int16Data));
       setSampleDuration(calculateSampleDuration(int16Data.length, isHalfSpeed));
     } else {
-      setVolumeDb(0);
-      setPitchSemitones(0);
-      setTrim(0);
-      setDither(false);
       setMaxTrim(0);
       setSampleData(null);
       setSampleDuration(0);
-      setSampleName("");
+      currentPitchRef.current = 0;
     }
   }, [selectedSampleIndex, samples, isHalfSpeed, isApplyingPitchShift]);
 
-  const handlePlaySample = useCallback((index: number) => {
-    kitPlaySample(index);
-  }, [kitPlaySample]);
-
   const handleUpdateSampleVolume = useCallback((value: number) => {
     if (selectedSampleIndex !== null) {
-      isUserUpdate.current = true;
-      setVolumeDb(value);
       updateSampleVolume(selectedSampleIndex, value);
-      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
   }, [updateSampleVolume, selectedSampleIndex]);
 
   const handleUpdateSamplePitch = useCallback(async (value: number) => {
     if (selectedSampleIndex !== null) {
-      isUserUpdate.current = true;
-      setPitchSemitones(value);
       currentPitchRef.current = value;
       updateSamplePitch(selectedSampleIndex, value);
       setIsApplyingPitchShift(true);
@@ -118,19 +89,11 @@ export function SampleEditor({
             instance.applyPitchShift(isHalfSpeed);
           }
 
-          // Write back the pitch-shifted sample to context state
           replaceSample(selectedSampleIndex, instance);
-
-          setPitchSemitones(currentPitchRef.current);
-
-          setTimeout(() => {
-            setIsApplyingPitchShift(false);
-            isUserUpdate.current = false;
-          }, 100);
+          setIsApplyingPitchShift(false);
         } catch (error) {
           console.error('Error applying pitch change:', error);
           setIsApplyingPitchShift(false);
-          isUserUpdate.current = false;
         }
       }
     }
@@ -138,29 +101,20 @@ export function SampleEditor({
 
   const handleUpdateSampleTrim = useCallback((value: number) => {
     if (selectedSampleIndex !== null) {
-      isUserUpdate.current = true;
-      setTrim(value);
       updateSampleTrim(selectedSampleIndex, value);
-      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
   }, [updateSampleTrim, selectedSampleIndex]);
 
   const handleUpdateSampleDither = useCallback((value: boolean) => {
     if (selectedSampleIndex !== null) {
-      isUserUpdate.current = true;
-      setDither(value);
       updateSampleDither(selectedSampleIndex, value);
-      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
   }, [updateSampleDither, selectedSampleIndex]);
 
   const handleUpdateSampleName = useCallback((value: string) => {
     if (selectedSampleIndex !== null) {
-      isUserUpdate.current = true;
       const sanitizedName = sanitizeLSDJInput(value).substring(0, 3);
-      setSampleName(sanitizedName);
       updateSampleName(selectedSampleIndex, sanitizedName);
-      setTimeout(() => { isUserUpdate.current = false; }, 50);
     }
   }, [updateSampleName, selectedSampleIndex]);
 
@@ -188,9 +142,6 @@ export function SampleEditor({
       setSelection,
     });
 
-  const canAdjustVolume = selectedSampleIndex !== null
-    && samples[selectedSampleIndex]?.canAdjustVolume() === true;
-
   // If there's a temporary recorded sample, show the temp sample editor
   if (tempRecordedSample) {
     return (
@@ -216,20 +167,22 @@ export function SampleEditor({
     );
   }
 
+  const s = samples[selectedSampleIndex]!;
+
   return (
     <div className="sample-editor" role="region" aria-label="Sample editor">
       <SampleHeader
-        sampleName={sampleName}
+        sampleName={s.getName()}
         isLoading={isLoading}
         onUpdateName={handleUpdateSampleName}
       />
 
       <SampleControls
-        canAdjustVolume={canAdjustVolume}
-        volumeDb={volumeDb}
-        pitchSemitones={pitchSemitones}
-        trim={trim}
-        dither={dither}
+        canAdjustVolume={s.canAdjustVolume()}
+        volumeDb={s.getVolumeDb()}
+        pitchSemitones={isApplyingPitchShift ? currentPitchRef.current : s.getPitchSemitones()}
+        trim={s.getTrim()}
+        dither={s.getDither()}
         maxTrim={maxTrim}
         isLoading={isLoading}
         onUpdateVolume={handleUpdateSampleVolume}
@@ -264,7 +217,7 @@ export function SampleEditor({
           sampleIndex={selectedSampleIndex}
           isLoading={isLoading}
           onRemoveSample={handleRemoveSample}
-          onPlaySample={handlePlaySample}
+          onPlaySample={kitPlaySample}
           onRevertSample={handleRevertSample}
         />
       </div>
