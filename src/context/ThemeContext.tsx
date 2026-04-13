@@ -89,7 +89,7 @@ interface ThemeProviderProps {
 
 // Create the theme provider component
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [currentPalette, setCurrentPalette] = useState<PaletteType>('gameboy');
+  const [currentPalette, setCurrentPalette] = useState<PaletteType>('snes');
   const availablePalettes = Object.keys(palettes) as PaletteType[];
 
   // Apply the palette to CSS variables
