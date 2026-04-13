@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useKitState, useKitActions } from '../../context/KitContext';
-import { SerializedSample, sampleToSerialized } from '../../utils/sample-serialization';
+import { Sample } from '../../services/audio';
 import { SampleWaveform } from './SampleWaveform';
 import { SampleControls } from './sample-editor/SampleControls';
 import { SampleHeader } from './sample-editor/SampleHeader';
@@ -14,7 +14,7 @@ import './SampleEditor.css';
 
 interface SampleEditorProps {
   selectedSampleIndex: number | null;
-  samples: (SerializedSample | null)[];
+  samples: (Sample | null)[];
   isHalfSpeed: boolean;
   isLoading: boolean;
 }
@@ -50,26 +50,26 @@ export function SampleEditor({
   const currentPitchRef = React.useRef(0);
   const isUserUpdate = React.useRef(false);
 
-  // Sync local state from serialized sample
+  // Sync local state from sample instance
   useEffect(() => {
     if (selectedSampleIndex !== null && samples[selectedSampleIndex]) {
       const s = samples[selectedSampleIndex]!;
 
       // Only sync control values from context when not a user-initiated update
       if (!isUserUpdate.current) {
-        setVolumeDb(s.volumeDb);
+        setVolumeDb(s.getVolumeDb());
         if (!isApplyingPitchShift) {
-          setPitchSemitones(s.pitchSemitones);
+          setPitchSemitones(s.getPitchSemitones());
         }
-        setTrim(s.trim);
-        setDither(s.dither);
-        setSampleName(s.name);
+        setTrim(s.getTrim());
+        setDither(s.getDither());
+        setSampleName(s.getName());
       }
 
-      const untrimmedLength = s.untrimmedLength;
+      const untrimmedLength = s.untrimmedLengthInSamples();
       setMaxTrim(Math.max(0, Math.floor(untrimmedLength / 32) - 1));
 
-      const int16Data = new Int16Array(s.processedSamples);
+      const int16Data = s.workSampleData();
       setSampleData(convertSampleDataForWaveform(int16Data));
       setSampleDuration(calculateSampleDuration(int16Data.length, isHalfSpeed));
     } else {
@@ -119,7 +119,7 @@ export function SampleEditor({
           }
 
           // Write back the pitch-shifted sample to context state
-          replaceSample(selectedSampleIndex, sampleToSerialized(instance));
+          replaceSample(selectedSampleIndex, instance);
 
           setPitchSemitones(currentPitchRef.current);
 
@@ -188,13 +188,8 @@ export function SampleEditor({
       setSelection,
     });
 
-  const sampleInstance = useMemo(
-    () => (selectedSampleIndex !== null && samples[selectedSampleIndex])
-      ? getSampleInstance(selectedSampleIndex)
-      : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedSampleIndex, samples]
-  );
+  const canAdjustVolume = selectedSampleIndex !== null
+    && samples[selectedSampleIndex]?.canAdjustVolume() === true;
 
   // If there's a temporary recorded sample, show the temp sample editor
   if (tempRecordedSample) {
@@ -230,7 +225,7 @@ export function SampleEditor({
       />
 
       <SampleControls
-        sample={sampleInstance!}
+        canAdjustVolume={canAdjustVolume}
         volumeDb={volumeDb}
         pitchSemitones={pitchSemitones}
         trim={trim}

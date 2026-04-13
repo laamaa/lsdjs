@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useKitState, useKitActions } from '../../../context/KitContext';
-import { SerializedSample, serializedToSample, sampleToSerialized } from '../../../utils/sample-serialization';
+import { Sample } from '../../../services/audio';
 import { SampleWaveform } from '../SampleWaveform';
 import { AudioService } from '../../../services/audio';
 import { SampleControls } from './SampleControls';
@@ -9,7 +9,7 @@ import { SampleSelectionTools } from './SampleSelectionTools';
 import { convertSampleDataForWaveform, calculateSampleDuration, int16ToArrayBuffer } from '../../../utils/sample-utils';
 
 interface TempSampleEditorProps {
-  tempRecordedSample: SerializedSample;
+  tempRecordedSample: Sample;
   isHalfSpeed: boolean;
   isLoading: boolean;
 }
@@ -24,34 +24,45 @@ export function TempSampleEditor({
 
   const [selection, setSelection] = useState<{ startFrame: number; endFrame: number } | null>(null);
 
-  const tempSample = useMemo(
-    () => serializedToSample(tempRecordedSample),
-    [tempRecordedSample]
-  );
-
-  const tempSampleSize = tempSample.lengthInBytes();
+  const tempSampleSize = tempRecordedSample.lengthInBytes();
   const isSampleTooLarge = kitInfo ? tempSampleSize > kitInfo.bytesFree : false;
+
+  const updateTemp = useCallback((mutator: (s: Sample) => void) => {
+    const cloned = Sample.dupeSample(tempRecordedSample);
+    mutator(cloned);
+    updateTempRecordedSample(cloned);
+  }, [tempRecordedSample, updateTempRecordedSample]);
 
   const applyFrameOp = useCallback((method: 'deleteFrames' | 'cropFrames' | 'fadeInFrames' | 'fadeOutFrames') => {
     if (!selection) return;
-    tempSample[method](
-      Math.min(selection.startFrame, selection.endFrame),
-      Math.max(selection.startFrame, selection.endFrame)
-    );
+    updateTemp(s => {
+      s[method](
+        Math.min(selection.startFrame, selection.endFrame),
+        Math.max(selection.startFrame, selection.endFrame)
+      );
+    });
     setSelection(null);
-    updateTempRecordedSample(sampleToSerialized(tempSample));
-  }, [selection, tempSample, updateTempRecordedSample]);
+  }, [selection, updateTemp]);
 
   const handlePreviewSample = useCallback(async () => {
     try {
       AudioService.stopAll();
-      const data = tempSample.workSampleData();
+      const data = tempRecordedSample.workSampleData();
       const sampleRate = isHalfSpeed ? 5734 : 11468;
       await AudioService.playAudioBuffer(int16ToArrayBuffer(data), {}, sampleRate);
     } catch (error) {
       console.error('Error playing sample:', error);
     }
-  }, [tempSample, isHalfSpeed]);
+  }, [tempRecordedSample, isHalfSpeed]);
+
+  const waveformData = useMemo(
+    () => convertSampleDataForWaveform(tempRecordedSample.workSampleData()),
+    [tempRecordedSample]
+  );
+  const waveformDuration = useMemo(
+    () => calculateSampleDuration(tempRecordedSample.lengthInSamples(), isHalfSpeed),
+    [tempRecordedSample, isHalfSpeed]
+  );
 
   return (
     <div className="sample-editor" role="region" aria-label="Sample editor">
@@ -63,49 +74,30 @@ export function TempSampleEditor({
       </div>
 
       <SampleHeader
-        sampleName={tempSample.getName()}
+        sampleName={tempRecordedSample.getName()}
         isLoading={isLoading}
-        onUpdateName={(name) => {
-          tempSample.setName(name);
-          updateTempRecordedSample(sampleToSerialized(tempSample));
-        }}
+        onUpdateName={(name) => updateTemp(s => s.setName(name))}
       />
 
       <SampleControls
-        sample={tempSample}
-        volumeDb={tempSample.getVolumeDb()}
-        pitchSemitones={tempSample.getPitchSemitones()}
-        trim={tempSample.getTrim()}
-        dither={tempSample.getDither()}
-        maxTrim={Math.max(0, Math.floor(tempSample.untrimmedLengthInSamples() / 32) - 1)}
+        canAdjustVolume={tempRecordedSample.canAdjustVolume()}
+        volumeDb={tempRecordedSample.getVolumeDb()}
+        pitchSemitones={tempRecordedSample.getPitchSemitones()}
+        trim={tempRecordedSample.getTrim()}
+        dither={tempRecordedSample.getDither()}
+        maxTrim={Math.max(0, Math.floor(tempRecordedSample.untrimmedLengthInSamples() / 32) - 1)}
         isLoading={isLoading}
         disableControls={true}
-        onUpdateVolume={(value) => {
-          tempSample.setVolumeDb(value);
-          tempSample.processSamples();
-          updateTempRecordedSample(sampleToSerialized(tempSample));
-        }}
-        onUpdatePitch={(value) => {
-          tempSample.setPitchSemitones(value);
-          tempSample.applyPitchShift(isHalfSpeed);
-          updateTempRecordedSample(sampleToSerialized(tempSample));
-        }}
-        onUpdateTrim={(value) => {
-          tempSample.setTrim(value);
-          tempSample.processSamples();
-          updateTempRecordedSample(sampleToSerialized(tempSample));
-        }}
-        onUpdateDither={(value) => {
-          tempSample.setDither(value);
-          tempSample.processSamples();
-          updateTempRecordedSample(sampleToSerialized(tempSample));
-        }}
+        onUpdateVolume={(value) => updateTemp(s => { s.setVolumeDb(value); s.processSamples(); })}
+        onUpdatePitch={(value) => updateTemp(s => { s.setPitchSemitones(value); s.applyPitchShift(isHalfSpeed); })}
+        onUpdateTrim={(value) => updateTemp(s => { s.setTrim(value); s.processSamples(); })}
+        onUpdateDither={(value) => updateTemp(s => { s.setDither(value); s.processSamples(); })}
       />
 
       <div className="sample-waveform-selection">
         <SampleWaveform
-          data={convertSampleDataForWaveform(tempSample.workSampleData())}
-          duration={calculateSampleDuration(tempSample.lengthInSamples(), isHalfSpeed)}
+          data={waveformData}
+          duration={waveformDuration}
           height={128}
           onSelection={setSelection}
           selection={selection}

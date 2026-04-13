@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useRomState, useRomActions } from './RomContext';
 import { useKitState, useKitActions } from './KitContext';
 import { SampleBankCompiler } from '../services/audio';
-import { serializedToSample } from '../utils/sample-serialization';
 
 /**
  * Coordinator component that handles cross-provider side effects:
@@ -39,15 +38,13 @@ export function RomKitSync() {
       const currentRomData = romDataRef.current;
       if (!currentRomData) return;
 
-      const sampleInstances = samples.map(s => s ? serializedToSample(s) : null);
-
       const updatedRomData = new ArrayBuffer(currentRomData.byteLength);
       new Uint8Array(updatedRomData).set(new Uint8Array(currentRomData));
 
       SampleBankCompiler.writeToRomBank(
         updatedRomData,
         kitInfo.bankIndex,
-        sampleInstances,
+        samples,
         kitInfo.name,
         useGbaPolarity
       );

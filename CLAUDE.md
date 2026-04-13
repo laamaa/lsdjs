@@ -41,7 +41,7 @@ Binary Data (ArrayBuffer/Uint8Array) & Web Audio API
 Uses plain `useState` + React Context (no Redux). Each provider exposes state + actions via a custom hook.
 
 - **`RomProvider` / `useRom()`** — ROM file loading/export, ROM metadata (`romInfo`) and binary data (`romData`). Actions: `loadRomFile()`, `exportRomFile(kitData)`, `updateRomData(data)`.
-- **`KitProvider` / `useKit()`** — Sample kit management using `SerializedSample` (plain objects, not class instances). Actions for all sample editing (volume, pitch, trim, fade, crop, etc.), kit load/save, audio playback. File objects stored in a `useRef<Map>` inside the provider.
+- **`KitProvider` / `useKit()`** — Sample kit management storing `Sample` class instances directly in state. Actions for all sample editing (volume, pitch, trim, fade, crop, etc.), kit load/save, audio playback. File objects stored in a `useRef<Map>` inside the provider. Uses clone-before-mutate pattern (`Sample.dupeSample()`) to ensure React detects state changes.
 - **`SaveFileProvider` / `useSaveFile()`** — LSDJ `.sav` file loading, song import/export/selection. Fully self-contained.
 - **`RomKitSync`** — Coordinator component (renders null) that auto-loads the first kit when a ROM is loaded and debounce-syncs kit changes back to ROM data.
 - **`useLoadingState`** — Shared hook for async loading/error state patterns used by all providers.
@@ -50,12 +50,11 @@ Uses plain `useState` + React Context (no Redux). Each provider exposes state + 
 
 ### Sample Data Model
 
-Samples are stored as `SerializedSample` (plain objects with `number[]` arrays) in context state, not as `Sample` class instances. The `Sample` class is instantiated on-demand when needed for:
-- `SampleBankCompiler` operations (compile/write ROM banks)
-- Audio playback
-- Editing operations that delegate to Sample methods
+`Sample` class instances (with `Int16Array` audio buffers) are stored directly in context state. The `Sample` class holds `processedSamples`, `originalSamples`, and `uneditedSamples` as `Int16Array`, plus metadata (name, volume, pitch, trim, dither, halfSpeed).
 
-Conversion utilities in `src/utils/sample-serialization.ts`: `sampleToSerialized()`, `serializedToSample()`, `calculateKitMemory()`.
+**Clone-before-mutate pattern:** Since React detects changes via reference equality, `Sample.dupeSample()` is called before any mutation to create a new instance. The `updateSampleAt()` helper in `KitProvider` enforces this for all standard edit operations.
+
+Kit memory utilities in `src/utils/sample-serialization.ts`: `calculateKitMemory()`, `MAX_SAMPLE_SPACE`, `MAX_SAMPLES`.
 
 ### Services (`src/services/`)
 

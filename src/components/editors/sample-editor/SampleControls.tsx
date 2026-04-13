@@ -1,27 +1,23 @@
 import React from 'react';
 import { CustomSlider, CustomCheckbox } from '../../common';
-import { Sample } from '../../../services/audio';
 
 interface SampleControlsProps {
-  sample: Sample;
+  canAdjustVolume: boolean;
   volumeDb: number;
   pitchSemitones: number;
   trim: number;
   dither: boolean;
   maxTrim: number;
   isLoading: boolean;
-  disableControls?: boolean; // Optional prop to disable volume, pitch, and trim controls
+  disableControls?: boolean;
   onUpdateVolume: (value: number) => void;
   onUpdatePitch: (value: number) => void;
   onUpdateTrim: (value: number) => void;
   onUpdateDither: (value: boolean) => void;
 }
 
-/**
- * Component for controlling sample properties (volume, pitch, trim, dither)
- */
 export function SampleControls({
-  sample,
+  canAdjustVolume,
   volumeDb,
   pitchSemitones,
   trim,
@@ -34,7 +30,6 @@ export function SampleControls({
   onUpdateTrim,
   onUpdateDither
 }: SampleControlsProps) {
-  const canAdjustVolume = sample.canAdjustVolume() && !disableControls;
 
   return (
     <div className="sample-controls">

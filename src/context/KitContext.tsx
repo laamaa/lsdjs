@@ -3,9 +3,6 @@ import { FileService } from '../services/file/FileService';
 import { Sample, SampleBankCompiler, AudioService } from '../services/audio';
 import { useLoadingState } from './useLoadingState';
 import {
-  SerializedSample,
-  sampleToSerialized,
-  serializedToSample,
   calculateKitMemory,
   MAX_SAMPLE_SPACE,
   MAX_SAMPLES,
@@ -23,14 +20,14 @@ export interface KitInfo {
 
 export interface KitState {
   kitInfo: KitInfo | null;
-  samples: (SerializedSample | null)[];
+  samples: (Sample | null)[];
   selectedSampleIndex: number | null;
   selectedBankIndex: number;
   isHalfSpeed: boolean;
   useGbaPolarity: boolean;
   isLoading: boolean;
   error: string | null;
-  tempRecordedSample: SerializedSample | null;
+  tempRecordedSample: Sample | null;
 }
 
 export interface KitActions {
@@ -51,9 +48,9 @@ export interface KitActions {
   cropFrames: (sampleIndex: number, startFrame: number, endFrame: number) => void;
   fadeInFrames: (sampleIndex: number, startFrame: number, endFrame: number) => void;
   fadeOutFrames: (sampleIndex: number, startFrame: number, endFrame: number) => void;
-  replaceSample: (index: number, sample: SerializedSample) => void;
+  replaceSample: (index: number, sample: Sample) => void;
   clearTempRecordedSample: () => void;
-  updateTempRecordedSample: (sample: SerializedSample) => void;
+  updateTempRecordedSample: (sample: Sample) => void;
   loadKitFromRomBank: (romData: ArrayBuffer, bankIndex: number) => Promise<void>;
   loadKitFromFile: (romData: ArrayBuffer) => Promise<ArrayBuffer | null>;
   saveKitToFile: (romData: ArrayBuffer) => Promise<void>;
@@ -78,12 +75,12 @@ interface KitProviderProps {
 
 export function KitProvider({ children, initialState }: KitProviderProps) {
   const [kitInfo, setKitInfo] = useState<KitInfo | null>(initialState?.kitInfo ?? null);
-  const [samples, setSamples] = useState<(SerializedSample | null)[]>(initialState?.samples ?? Array(MAX_SAMPLES).fill(null));
+  const [samples, setSamples] = useState<(Sample | null)[]>(initialState?.samples ?? Array(MAX_SAMPLES).fill(null));
   const [selectedSampleIndex, setSelectedSampleIndex] = useState<number | null>(initialState?.selectedSampleIndex ?? null);
   const [selectedBankIndex, setSelectedBankIndex] = useState(initialState?.selectedBankIndex ?? 0);
   const [isHalfSpeed, setIsHalfSpeed] = useState(initialState?.isHalfSpeed ?? false);
   const [useGbaPolarity, setUseGbaPolarity] = useState(initialState?.useGbaPolarity ?? false);
-  const [tempRecordedSample, setTempRecordedSample] = useState<SerializedSample | null>(initialState?.tempRecordedSample ?? null);
+  const [tempRecordedSample, setTempRecordedSample] = useState<Sample | null>(initialState?.tempRecordedSample ?? null);
   const { isLoading, error, setError, withLoading } = useLoadingState(
     initialState?.isLoading ?? false,
     initialState?.error ?? null
@@ -95,28 +92,20 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
   const stateRef = useRef({ kitInfo, samples, selectedSampleIndex, selectedBankIndex, isHalfSpeed, useGbaPolarity, tempRecordedSample });
   stateRef.current = { kitInfo, samples, selectedSampleIndex, selectedBankIndex, isHalfSpeed, useGbaPolarity, tempRecordedSample };
 
-  // Helper: apply a Sample method to a serialized sample, returning updated serialized
-  function withSampleInstance(
-    s: SerializedSample,
-    fn: (sample: Sample) => void
-  ): SerializedSample {
-    const instance = serializedToSample(s);
-    fn(instance);
-    return sampleToSerialized(instance);
-  }
-
-  function updateSampleAt(index: number, updater: (s: SerializedSample) => SerializedSample) {
+  function updateSampleAt(index: number, mutator: (s: Sample) => void) {
     const s = stateRef.current.samples[index];
     if (!s) return;
+    const cloned = Sample.dupeSample(s);
+    mutator(cloned);
     const newSamples = [...stateRef.current.samples];
-    newSamples[index] = updater(s);
+    newSamples[index] = cloned;
 
     setSamples(newSamples);
     const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(newSamples);
     setKitInfo(prev => prev ? { ...prev, totalSampleSizeInBytes, bytesFree } : prev);
   }
 
-  function replaceSampleAt(index: number, sample: SerializedSample) {
+  function replaceSampleAt(index: number, sample: Sample) {
     const newSamples = [...stateRef.current.samples];
     newSamples[index] = sample;
 
@@ -132,9 +121,9 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     endFrame: number,
     method: 'deleteFrames' | 'cropFrames' | 'fadeInFrames' | 'fadeOutFrames'
   ) {
-    updateSampleAt(sampleIndex, s => withSampleInstance(s, sample => {
+    updateSampleAt(sampleIndex, sample => {
       sample[method](startFrame, endFrame);
-    }));
+    });
   }
 
   const actions = useMemo(() => ({
@@ -142,9 +131,9 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     selectBank: (index: number) => setSelectedBankIndex(index),
     setHalfSpeed: (value: boolean) => setIsHalfSpeed(value),
     setGbaPolarity: (value: boolean) => setUseGbaPolarity(value),
-    replaceSample: (index: number, sample: SerializedSample) => replaceSampleAt(index, sample),
+    replaceSample: (index: number, sample: Sample) => replaceSampleAt(index, sample),
     clearTempRecordedSample: () => setTempRecordedSample(null),
-    updateTempRecordedSample: (sample: SerializedSample) => setTempRecordedSample(sample),
+    updateTempRecordedSample: (sample: Sample) => setTempRecordedSample(sample),
 
     renameKit: (name: string) => {
       setKitInfo(prev => prev ? { ...prev, name } : prev);
@@ -187,7 +176,7 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     },
 
     revertSample: (index: number) => {
-      updateSampleAt(index, s => withSampleInstance(s, sample => {
+      updateSampleAt(index, sample => {
         sample.setVolumeDb(0);
         sample.setPitchSemitones(0);
         sample.setTrim(0);
@@ -196,36 +185,40 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
           sample.setOriginalSamplesFromUnedited();
           sample.processSamples();
         }
-      }));
+      });
     },
 
     updateSampleVolume: (sampleIndex: number, volumeDb: number) => {
-      updateSampleAt(sampleIndex, s => withSampleInstance(s, sample => {
+      updateSampleAt(sampleIndex, sample => {
         sample.setVolumeDb(volumeDb);
         sample.processSamples();
-      }));
+      });
     },
 
     updateSamplePitch: (sampleIndex: number, pitchSemitones: number) => {
-      updateSampleAt(sampleIndex, s => ({ ...s, pitchSemitones }));
+      updateSampleAt(sampleIndex, sample => {
+        sample.setPitchSemitones(pitchSemitones);
+      });
     },
 
     updateSampleTrim: (sampleIndex: number, trim: number) => {
-      updateSampleAt(sampleIndex, s => withSampleInstance(s, sample => {
+      updateSampleAt(sampleIndex, sample => {
         sample.setTrim(trim);
         sample.processSamples();
-      }));
+      });
     },
 
     updateSampleDither: (sampleIndex: number, dither: boolean) => {
-      updateSampleAt(sampleIndex, s => withSampleInstance(s, sample => {
+      updateSampleAt(sampleIndex, sample => {
         sample.setDither(dither);
         sample.processSamples();
-      }));
+      });
     },
 
     updateSampleName: (sampleIndex: number, name: string) => {
-      updateSampleAt(sampleIndex, s => ({ ...s, name: name.toUpperCase().substring(0, 3) }));
+      updateSampleAt(sampleIndex, sample => {
+        sample.setName(name);
+      });
     },
 
     deleteFrames: (sampleIndex: number, startFrame: number, endFrame: number) => {
@@ -247,7 +240,7 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     getSampleInstance: (index: number): Sample | null => {
       const s = stateRef.current.samples[index];
       if (!s) return null;
-      const instance = serializedToSample(s);
+      const instance = Sample.dupeSample(s);
       const file = fileMapRef.current.get(index);
       if (file) instance.setFile(file);
       return instance;
@@ -256,10 +249,9 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     loadKitFromRomBank: (romData: ArrayBuffer, bankIndex: number) =>
       withLoading('Failed to load kit from ROM bank', async () => {
         const { samples: extracted, kitName } = await SampleBankCompiler.extractFromRomBank(romData, bankIndex);
-        const serialized = extracted.map(s => s ? sampleToSerialized(s) : null);
-        const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(serialized);
+        const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(extracted);
 
-        setSamples(serialized);
+        setSamples(extracted);
         setKitInfo({
           name: kitName,
           bankIndex,
@@ -290,10 +282,9 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         new Uint8Array(newRomData).set(new Uint8Array(fileData), bankIdx * BANK_SIZE);
 
         const { samples: extracted, kitName } = await SampleBankCompiler.extractFromRomBank(newRomData, bankIdx);
-        const serialized = extracted.map(s => s ? sampleToSerialized(s) : null);
-        const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(serialized);
+        const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(extracted);
 
-        setSamples(serialized);
+        setSamples(extracted);
         setKitInfo({
           name: kitName,
           bankIndex: bankIdx,
@@ -345,15 +336,13 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
 
         // Check if it fits
         const newSamples = [...currentSamples];
-        const serialized = sampleToSerialized(sample);
-        newSamples[firstFreeSlot] = serialized;
+        newSamples[firstFreeSlot] = sample;
         const { bytesFree } = calculateKitMemory(newSamples);
 
         if (bytesFree < 0) {
           const trim = Math.ceil(-bytesFree / 16);
           sample.setTrim(trim);
           await sample.reload(halfSpeed);
-          newSamples[firstFreeSlot] = sampleToSerialized(sample);
         }
 
         fileMapRef.current.set(firstFreeSlot, file);
@@ -379,18 +368,11 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         // Resample
         const resampled = resample(sampleData, inSampleRate, outSampleRate);
 
-        setTempRecordedSample({
-          name: 'REC',
-          processedSamples: Array.from(resampled),
-          originalSamples: Array.from(resampled),
-          uneditedSamples: Array.from(resampled),
-          untrimmedLength: resampled.length,
-          volumeDb: 0,
-          pitchSemitones: 0,
-          trim: 0,
-          dither: false,
-          halfSpeed,
-        });
+        const sample = new Sample(resampled, 'REC');
+        sample.setOriginalSamples(resampled.slice());
+        sample.setUneditedSamples(resampled.slice());
+        sample.setHalfSpeed(halfSpeed);
+        setTempRecordedSample(sample);
       }),
 
     saveTempSampleToKit: () => {
@@ -403,21 +385,17 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         return;
       }
 
-      // Process the temp sample through Sample instance to apply settings
-      const instance = serializedToSample(temp);
+      const instance = Sample.dupeSample(temp);
 
       const newSamples = [...currentSamples];
-      let serialized = sampleToSerialized(instance);
+      newSamples[firstFreeSlot] = instance;
 
       // Check if it fits, trim if needed
-      newSamples[firstFreeSlot] = serialized;
       const { bytesFree } = calculateKitMemory(newSamples);
       if (bytesFree < 0) {
         const trim = Math.ceil(-bytesFree / 16);
         instance.setTrim(trim);
         instance.processSamples();
-        serialized = sampleToSerialized(instance);
-        newSamples[firstFreeSlot] = serialized;
       }
 
       setSamples(newSamples);
@@ -434,7 +412,7 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
 
       try {
         AudioService.stopAll();
-        const data = new Int16Array(s.processedSamples);
+        const data = s.workSampleData();
         const sampleRate = halfSpeed ? 5734 : 11468;
         await AudioService.playAudioBuffer(int16ToArrayBuffer(data), {}, sampleRate);
       } catch {

@@ -5,7 +5,7 @@ import { vi } from 'vitest';
 import { RomProvider, RomInfo } from '../../../context/RomContext';
 import { KitProvider } from '../../../context/KitContext';
 import { KitInfo } from '../../../context/KitContext';
-import { SerializedSample } from '../../../utils/sample-serialization';
+import { Sample } from '../../../services/audio';
 
 // Mock the AudioService to avoid actual audio playback during tests
 vi.mock('../../../services/audio/AudioService', () => ({
@@ -32,18 +32,13 @@ const mockRomInfo: RomInfo = {
   kitNames: {},
 };
 
-const mockSample: SerializedSample = {
-  name: 'TST',
-  processedSamples: new Array(32).fill(0),
-  originalSamples: new Array(32).fill(0),
-  uneditedSamples: new Array(32).fill(0),
-  untrimmedLength: 32,
-  volumeDb: 0,
-  pitchSemitones: 0,
-  trim: 0,
-  dither: false,
-  halfSpeed: false,
-};
+function makeMockSample(): Sample {
+  const data = new Int16Array(32);
+  const sample = new Sample(data, 'TST');
+  sample.setOriginalSamples(data.slice());
+  sample.setUneditedSamples(data.slice());
+  return sample;
+}
 
 const mockKitInfo: KitInfo = {
   name: 'TESTKIT',
@@ -55,7 +50,7 @@ const mockKitInfo: KitInfo = {
 
 function renderKitEditor(opts?: {
   romState?: Partial<{ romInfo: RomInfo | null; romData: ArrayBuffer | null }>;
-  kitState?: Partial<{ kitInfo: KitInfo | null; samples: (SerializedSample | null)[]; selectedSampleIndex: number | null; selectedBankIndex: number; error: string | null }>;
+  kitState?: Partial<{ kitInfo: KitInfo | null; samples: (Sample | null)[]; selectedSampleIndex: number | null; selectedBankIndex: number; error: string | null }>;
 }) {
   return render(
     <RomProvider initialState={{
@@ -91,7 +86,7 @@ describe('KitEditor', () => {
       romState: { romInfo: mockRomInfo, romData: new ArrayBuffer(1024) },
       kitState: {
         kitInfo: mockKitInfo,
-        samples: [mockSample, ...Array(14).fill(null)],
+        samples: [makeMockSample(), ...Array(14).fill(null)],
       },
     });
 
@@ -106,7 +101,7 @@ describe('KitEditor', () => {
       romState: { romInfo: mockRomInfo, romData: new ArrayBuffer(1024) },
       kitState: {
         kitInfo: mockKitInfo,
-        samples: [mockSample, ...Array(14).fill(null)],
+        samples: [makeMockSample(), ...Array(14).fill(null)],
         selectedSampleIndex: 0,
       },
     });
@@ -135,7 +130,7 @@ describe('KitEditor', () => {
       romState: { romInfo: mockRomInfo, romData: new ArrayBuffer(1024) },
       kitState: {
         kitInfo: { ...mockKitInfo, bankIndex: 1 },
-        samples: [mockSample, ...Array(14).fill(null)],
+        samples: [makeMockSample(), ...Array(14).fill(null)],
         selectedBankIndex: 1,
       },
     });

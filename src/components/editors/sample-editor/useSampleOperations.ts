@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { SerializedSample } from '../../../utils/sample-serialization';
+import { Sample } from '../../../services/audio';
 
 interface Selection {
   startFrame: number;
@@ -9,7 +9,7 @@ interface Selection {
 interface UseSampleOperationsInput {
   selectedSampleIndex: number | null;
   selection: Selection | null;
-  samples: (SerializedSample | null)[];
+  samples: (Sample | null)[];
   deleteFrames: (sampleIndex: number, startFrame: number, endFrame: number) => void;
   cropFrames: (sampleIndex: number, startFrame: number, endFrame: number) => void;
   fadeInFrames: (sampleIndex: number, startFrame: number, endFrame: number) => void;
@@ -35,7 +35,7 @@ export function useSampleOperations({
       if (window.confirm(confirmMsg)) {
         const s = samples[selectedSampleIndex];
         if (s) {
-          const len = s.processedSamples.length;
+          const len = s.lengthInSamples();
           const startFrame = Math.min(selection.startFrame, len - 1);
           const endFrame = Math.min(selection.endFrame, len - 1);
           const minFrame = Math.min(startFrame, endFrame);

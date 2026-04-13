@@ -1,7 +1,6 @@
 import {useState} from 'react';
 import {useRomState, useRomActions} from '../../context/RomContext';
 import {useKitState} from '../../context/KitContext';
-import {serializedToSample} from '../../utils/sample-serialization';
 import './RomInfoDisplay.css';
 
 /**
@@ -20,9 +19,7 @@ export function RomInfoDisplay() {
   }
 
   function handleExportRom() {
-    // Reconstruct Sample instances for SampleBankCompiler
-    const sampleInstances = kit.samples.map(s => s ? serializedToSample(s) : null);
-    exportRomFile({ kitInfo: kit.kitInfo, samples: sampleInstances, useGbaPolarity: kit.useGbaPolarity });
+    exportRomFile({ kitInfo: kit.kitInfo, samples: kit.samples, useGbaPolarity: kit.useGbaPolarity });
   }
 
   function handleToggleExpand() {

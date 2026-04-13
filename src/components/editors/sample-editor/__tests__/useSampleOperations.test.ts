@@ -1,21 +1,13 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useSampleOperations } from '../useSampleOperations';
-import { SerializedSample } from '../../../../utils/sample-serialization';
+import { Sample } from '../../../../services/audio';
 
-function makeSample(processedLength: number): SerializedSample {
-  return {
-    name: 'test',
-    processedSamples: new Array(processedLength).fill(0),
-    originalSamples: null,
-    uneditedSamples: null,
-    untrimmedLength: processedLength,
-    volumeDb: 0,
-    pitchSemitones: 0,
-    trim: 0,
-    dither: false,
-    sampleRate: 11468,
-  };
+function makeSample(processedLength: number): Sample {
+  const data = new Int16Array(processedLength);
+  const sample = new Sample(data, 'TST');
+  sample.setOriginalSamples(data.slice());
+  return sample;
 }
 
 describe('useSampleOperations', () => {

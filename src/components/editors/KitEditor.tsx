@@ -4,7 +4,6 @@ import { useKitState, useKitActions } from '../../context/KitContext';
 import { SampleEditor } from './SampleEditor';
 import { BankNameSelector } from '../common/BankNameSelector';
 import { CustomCheckbox } from '../common';
-import { SerializedSample } from '../../utils/sample-serialization';
 import './KitEditor.css';
 
 export function KitEditor() {
@@ -86,7 +85,7 @@ export function KitEditor() {
         {Array.from({ length: 15 }).map((_, index) => {
           const sample = samples[index];
           const isEmpty = !sample;
-          const name = sample ? sample.name : '-';
+          const name = sample ? sample.getName() : '-';
 
           return (
             <button
@@ -172,7 +171,7 @@ export function KitEditor() {
         <div className="control-group-kit">
           <button
             onClick={handleAddSample}
-            disabled={!kitInfo || isLoading || samples.every((s: SerializedSample | null) => s !== null)}
+            disabled={!kitInfo || isLoading || samples.every(s => s !== null)}
           >
             Add Sample
           </button>
