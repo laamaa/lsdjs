@@ -539,4 +539,215 @@ describe('Sample', () => {
       expect(updatedOriginalSamples[8]).toBe(9000); // Index 9 from original
     });
   });
+
+  describe('processSamples', () => {
+    it('should produce output from originalSamples with default settings', () => {
+      // Create a sample with loud data (above silence threshold of 2048)
+      const sampleData = new Int16Array(64);
+      for (let i = 0; i < sampleData.length; i++) {
+        sampleData[i] = 10000; // constant, clearly above silence threshold
+      }
+
+      const sample = new Sample(sampleData, 'TST');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // Default settings: volumeDb=0, trim=0, dither=false
+      sample.processSamples();
+
+      const processed = sample.workSampleData();
+      expect(processed.length).toBeGreaterThan(0);
+      // With volumeDb=0, normalize divides by peak then multiplies by 1.0
+      // Peak is 10000/32767 ≈ 0.305, so normalized = round(10000 * 1.0 / 0.305) = 32767
+      // All samples should be the same value
+      for (let i = 0; i < processed.length; i++) {
+        expect(processed[i]).toBe(processed[0]);
+      }
+    });
+
+    it('should apply volume adjustment via normalization', () => {
+      const sampleData = new Int16Array(64);
+      sampleData.fill(16000); // above silence threshold
+
+      const sample = new Sample(sampleData, 'VOL');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // Process with 0 dB (no volume change relative to peak)
+      sample.setVolumeDb(0);
+      sample.processSamples();
+      const atZeroDb = sample.workSampleData();
+
+      // Process with -6 dB (quieter)
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setVolumeDb(-6);
+      sample.processSamples();
+      const atMinusSixDb = sample.workSampleData();
+
+      // -6 dB should produce quieter output than 0 dB
+      expect(Math.abs(atMinusSixDb[0])).toBeLessThan(Math.abs(atZeroDb[0]));
+    });
+
+    it('should trim samples from the end', () => {
+      // Create a sample with 128 non-silent samples
+      const sampleData = new Int16Array(128);
+      sampleData.fill(10000);
+
+      const sample = new Sample(sampleData, 'TRM');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // No trim
+      sample.setTrim(0);
+      sample.processSamples();
+      const untrimmedLength = sample.lengthInSamples();
+
+      // Trim 2 frames (2 * 32 = 64 samples from the end)
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setTrim(2);
+      sample.processSamples();
+      const trimmedLength = sample.lengthInSamples();
+
+      expect(trimmedLength).toBeLessThan(untrimmedLength);
+      // Should be approximately 64 samples shorter
+      expect(untrimmedLength - trimmedLength).toBe(64);
+    });
+
+    it('should produce different output with dither enabled', () => {
+      const sampleData = new Int16Array(64);
+      sampleData.fill(10000);
+
+      const sample = new Sample(sampleData, 'DTH');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // Without dither
+      sample.setDither(false);
+      sample.processSamples();
+      const withoutDither = sample.workSampleData();
+
+      // All values should be identical (constant input, no dither)
+      const allSame = withoutDither.every((v: number) => v === withoutDither[0]);
+      expect(allSame).toBe(true);
+
+      // With dither
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setDither(true);
+      sample.processSamples();
+      const withDither = sample.workSampleData();
+
+      // With dither, values should vary (random noise added)
+      // Not all values should be the same anymore
+      const allSameWithDither = withDither.every((v: number) => v === withDither[0]);
+      expect(allSameWithDither).toBe(false);
+    });
+
+    it('should not process if originalSamples is null', () => {
+      const sampleData = new Int16Array([100, 200, 300]);
+      const sample = new Sample(sampleData, 'NUL');
+      // originalSamples is null by default (not set)
+
+      sample.processSamples();
+
+      // processedSamples should remain unchanged
+      const processed = sample.workSampleData();
+      expect(processed[0]).toBe(100);
+      expect(processed[1]).toBe(200);
+      expect(processed[2]).toBe(300);
+    });
+  });
+
+  describe('applyPitchShift', () => {
+    it('should reset to unedited samples when pitch is 0', () => {
+      const sampleData = new Int16Array(64);
+      for (let i = 0; i < 64; i++) {
+        sampleData[i] = i * 500; // ramp signal, above silence threshold
+      }
+
+      const sample = new Sample(sampleData, 'PIT');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+      sample.setPitchSemitones(0);
+
+      const result = sample.applyPitchShift(false);
+
+      expect(result).toBe(true);
+      // originalSamples should be a copy of uneditedSamples
+      const original = sample.getOriginalSamples();
+      const unedited = sample.getUneditedSamples();
+      expect(original).not.toBeNull();
+      expect(original!.length).toBe(unedited!.length);
+      for (let i = 0; i < original!.length; i++) {
+        expect(original![i]).toBe(unedited![i]);
+      }
+    });
+
+    it('should produce shorter output when pitching up', () => {
+      const sampleData = new Int16Array(128);
+      sampleData.fill(10000); // above silence threshold
+
+      const sample = new Sample(sampleData, 'PUP');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // Pitch up by 12 semitones (1 octave) → resample at double rate → half the samples
+      sample.setPitchSemitones(12);
+      const result = sample.applyPitchShift(false);
+
+      expect(result).toBe(true);
+      const original = sample.getOriginalSamples();
+      expect(original).not.toBeNull();
+      // Pitching up should produce fewer samples (approximately half for +12 semitones)
+      expect(original!.length).toBeLessThan(128);
+      expect(original!.length).toBeCloseTo(64, -1); // approximately 64, within rounding
+    });
+
+    it('should produce longer output when pitching down', () => {
+      const sampleData = new Int16Array(64);
+      sampleData.fill(10000);
+
+      const sample = new Sample(sampleData, 'PDN');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // Pitch down by 12 semitones (1 octave) → resample at half rate → double the samples
+      sample.setPitchSemitones(-12);
+      const result = sample.applyPitchShift(false);
+
+      expect(result).toBe(true);
+      const original = sample.getOriginalSamples();
+      expect(original).not.toBeNull();
+      // Pitching down should produce more samples (approximately double for -12 semitones)
+      expect(original!.length).toBeGreaterThan(64);
+      expect(original!.length).toBeCloseTo(128, -1);
+    });
+
+    it('should return false if uneditedSamples is null', () => {
+      const sample = new Sample(null, 'NUL');
+      sample.setPitchSemitones(5);
+
+      const result = sample.applyPitchShift(false);
+      expect(result).toBe(false);
+    });
+
+    it('should always resample from uneditedSamples (not accumulate)', () => {
+      const sampleData = new Int16Array(128);
+      sampleData.fill(10000);
+
+      const sample = new Sample(sampleData, 'ACC');
+      sample.setOriginalSamples(sampleData.slice());
+      sample.setUneditedSamples(sampleData.slice());
+
+      // Apply pitch +12 twice
+      sample.setPitchSemitones(12);
+      sample.applyPitchShift(false);
+      const lengthAfterFirst = sample.getOriginalSamples()!.length;
+
+      sample.applyPitchShift(false);
+      const lengthAfterSecond = sample.getOriginalSamples()!.length;
+
+      // Both should produce the same result since we resample from uneditedSamples
+      expect(lengthAfterSecond).toBe(lengthAfterFirst);
+    });
+  });
 });

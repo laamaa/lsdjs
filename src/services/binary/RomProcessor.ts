@@ -80,11 +80,6 @@ export const RomProcessor = {
    */
   validatePaletteData(processor: BinaryProcessor): boolean {
     try {
-      // For small ROMs (like in tests), just return true if we have enough banks
-      if (processor.bufferSize < 28 * ROM_CONSTANTS.BANK_SIZE) {
-        return processor.bufferSize >= 2 * ROM_CONSTANTS.BANK_SIZE;
-      }
-
       return (
         this.getNumberOfPalettes(processor) > 0 &&
         this.findPaletteNameOffset(processor) > 0 &&
@@ -110,10 +105,6 @@ export const RomProcessor = {
 
     // Check if the ROM is large enough to contain bank 27
     if (processor.bufferSize < bankEnd) {
-      // For testing purposes, return a mock offset if we're in a test environment
-      if (processor.bufferSize < ROM_CONSTANTS.BANK_SIZE * 64) {
-        return bankStart + 100;
-      }
       return -1;
     }
 
@@ -148,10 +139,6 @@ export const RomProcessor = {
       }
     } catch (error) {
       console.warn('Error finding grayscale palette names:', error);
-      // For testing purposes, return a mock offset if we're in a test environment
-      if (processor.bufferSize < ROM_CONSTANTS.BANK_SIZE * 64) {
-        return bankStart + 100;
-      }
     }
 
     return -1;
@@ -189,12 +176,6 @@ export const RomProcessor = {
     // If we found at least one palette, consider it valid
     if (numPalettes > 0) {
       return Math.floor(numPalettes / 2);
-    }
-
-    // For testing purposes, return 1 if we're in a test environment
-    // This allows tests to pass without needing perfect ROM data
-    if (processor.bufferSize < ROM_CONSTANTS.BANK_SIZE * 64) {
-      return 1;
     }
 
     return -1;

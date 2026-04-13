@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useKitState, useKitActions } from '../../context/KitContext';
 import { Sample } from '../../services/audio';
+import { reloadSampleFromFile } from '../../services/audio/sample/SampleFactory';
 import { SampleWaveform } from './SampleWaveform';
 import { SampleControls } from './sample-editor/SampleControls';
 import { SampleHeader } from './sample-editor/SampleHeader';
@@ -32,7 +33,7 @@ export function SampleEditor({
     updateSampleDither, updateSampleName, removeSample: kitRemoveSample,
     revertSample: kitRevertSample, replaceSample,
     deleteFrames, cropFrames, fadeInFrames, fadeOutFrames,
-    getSampleInstance,
+    getSampleInstance, getSampleFile,
   } = useKitActions();
 
   const [selection, setSelection] = useState<{ startFrame: number; endFrame: number } | null>(null);
@@ -68,13 +69,14 @@ export function SampleEditor({
       setIsApplyingPitchShift(true);
 
       const instance = getSampleInstance(selectedSampleIndex);
+      const file = getSampleFile(selectedSampleIndex);
       if (instance) {
         try {
-          if (instance.getFile()) {
+          if (file) {
             instance.setPitchSemitones(0);
-            await instance.reload(isHalfSpeed);
+            await reloadSampleFromFile(instance, file, isHalfSpeed);
             instance.setPitchSemitones(value);
-            await instance.reload(isHalfSpeed);
+            await reloadSampleFromFile(instance, file, isHalfSpeed);
           } else {
             instance.setPitchSemitones(value);
             instance.applyPitchShift(isHalfSpeed);
@@ -88,7 +90,7 @@ export function SampleEditor({
         }
       }
     }
-  }, [updateSamplePitch, replaceSample, getSampleInstance, selectedSampleIndex, isHalfSpeed]);
+  }, [updateSamplePitch, replaceSample, getSampleInstance, getSampleFile, selectedSampleIndex, isHalfSpeed]);
 
   const handleUpdateSampleTrim = useCallback((value: number) => {
     if (selectedSampleIndex !== null) {

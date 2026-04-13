@@ -25,7 +25,6 @@ export class Sample {
   private pitchSemitones: number = 0;
   private trim: number = 0;
   private dither: boolean = false;
-  private file: File | null = null;
   private halfSpeed: boolean = false;
 
   /**
@@ -219,23 +218,6 @@ export class Sample {
   }
 
   /**
-   * Gets the original file associated with this sample
-   * Returns null for samples created from ROM or other sources
-   */
-  public getFile(): File | null {
-    return this.file;
-  }
-
-  /**
-   * Sets the file associated with this sample
-   * 
-   * @param file - The file to associate with this sample
-   */
-  public setFile(file: File | null): void {
-    this.file = file;
-  }
-
-  /**
    * Gets whether half-speed mode is enabled
    */
   public getHalfSpeed(): boolean {
@@ -322,27 +304,6 @@ export class Sample {
 
     // Convert back to Int16Array
     this.processedSamples = SampleUtils.toInt16Buffer(trimmedBuffer);
-  }
-
-  /**
-   * Reloads the sample from the file with the current settings
-   * 
-   * @param halfSpeed - Whether to use half-speed mode
-   */
-  public async reload(halfSpeed: boolean): Promise<void> {
-    if (!this.file) {
-      return;
-    }
-
-    this.halfSpeed = halfSpeed;
-    const outFactor = Math.pow(2.0, this.pitchSemitones / 12.0);
-    const samples = await SampleFactory.readSamples(this.file, halfSpeed, outFactor);
-
-    // Store the samples in both originalSamples and uneditedSamples
-    this.originalSamples = samples;
-    this.uneditedSamples = samples.slice(); // Keep a copy that will never be modified by pitch shifts
-
-    this.processSamples();
   }
 
   /**

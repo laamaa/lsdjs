@@ -39,8 +39,32 @@ export async function createFromNibbles(nibbles: Uint8Array, name: string): Prom
 }
 
 /**
+ * Reloads a sample's audio data from a file with the sample's current settings.
+ * This is the platform-specific operation that decodes audio and resamples.
+ * On other platforms (e.g. iOS), replace this function with the equivalent using
+ * AVAudioFile or AudioToolbox instead of Web Audio API.
+ *
+ * @param sample - The sample to reload
+ * @param file - The audio file to decode
+ * @param halfSpeed - Whether to use half-speed mode
+ */
+export async function reloadSampleFromFile(
+  sample: Sample,
+  file: File,
+  halfSpeed: boolean
+): Promise<void> {
+  const outFactor = Math.pow(2.0, sample.getPitchSemitones() / 12.0);
+  const samples = await readSamples(file, halfSpeed, outFactor);
+
+  sample.setOriginalSamples(samples);
+  sample.setUneditedSamples(samples.slice());
+  sample.setHalfSpeed(halfSpeed);
+  sample.processSamples();
+}
+
+/**
  * Creates a sample from a WAV file
- * 
+ *
  * @param file - The WAV file
  * @param options - The sample processing options
  * @returns A new Sample instance
@@ -53,14 +77,13 @@ export async function createFromWav(
 
   const fileName = file.name.split('.')[0];
   const sample = new Sample(null, fileName);
-  sample.setFile(file);
   sample.setDither(dither);
   sample.setVolumeDb(volumeDb);
   sample.setTrim(trim);
   sample.setPitchSemitones(pitchSemitones);
   sample.setHalfSpeed(halfSpeed);
 
-  await sample.reload(halfSpeed);
+  await reloadSampleFromFile(sample, file, halfSpeed);
   return sample;
 }
 
@@ -72,7 +95,6 @@ export async function createFromWav(
  */
 export function dupeSample(sample: Sample): Sample {
   const newSample = new Sample(null, sample.getName());
-  newSample.setFile(sample.getFile());
   newSample.setOriginalSamples(sample.getOriginalSamples() ? sample.getOriginalSamples()!.slice() : null);
   newSample.setUneditedSamples(sample.getUneditedSamples() ? sample.getUneditedSamples()!.slice() : null);
   newSample.setProcessedSamples(sample.workSampleData());

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useMemo, useRef, useEffect, ReactNode } from 'react';
 import { FileService } from '../services/file/FileService';
 import { Sample, SampleBankCompiler, AudioService } from '../services/audio';
+import { reloadSampleFromFile } from '../services/audio/sample/SampleFactory';
 import { useLoadingState } from './useLoadingState';
 import {
   calculateKitMemory,
@@ -59,6 +60,7 @@ export interface KitActions {
   saveTempSampleToKit: () => void;
   playSample: (sampleIndex: number) => Promise<void>;
   getSampleInstance: (index: number) => Sample | null;
+  getSampleFile: (index: number) => File | null;
 }
 
 type KitContextValue = KitState & KitActions;
@@ -110,14 +112,6 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
   function replaceSampleAt(index: number, sample: Sample) {
     const newSamples = [...stateRef.current.samples];
     newSamples[index] = sample;
-
-    // Keep fileMapRef in sync with the sample's file reference
-    const file = sample.getFile();
-    if (file) {
-      fileMapRef.current.set(index, file);
-    } else {
-      fileMapRef.current.delete(index);
-    }
 
     setSamples(newSamples);
     const { totalSampleSizeInBytes, bytesFree } = calculateKitMemory(newSamples);
@@ -250,10 +244,11 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
     getSampleInstance: (index: number): Sample | null => {
       const s = stateRef.current.samples[index];
       if (!s) return null;
-      const instance = Sample.dupeSample(s);
-      const file = fileMapRef.current.get(index);
-      if (file) instance.setFile(file);
-      return instance;
+      return Sample.dupeSample(s);
+    },
+
+    getSampleFile: (index: number): File | null => {
+      return fileMapRef.current.get(index) ?? null;
     },
 
     loadKitFromRomBank: (romData: ArrayBuffer, bankIndex: number) =>
@@ -351,7 +346,7 @@ export function KitProvider({ children, initialState }: KitProviderProps) {
         if (bytesFree < 0) {
           const trim = Math.ceil(-bytesFree / 16);
           sample.setTrim(trim);
-          await sample.reload(halfSpeed);
+          await reloadSampleFromFile(sample, file, halfSpeed);
         }
 
         fileMapRef.current.set(firstFreeSlot, file);

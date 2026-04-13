@@ -288,6 +288,126 @@ describe('SampleBankCompiler', () => {
     });
   });
 
+  describe('compile - detailed nibble verification', () => {
+    it('should quantize silence (0) to nibble 8 (GBA) or 7 (DMG)', () => {
+      // Value 0: round(0 / 4096 + 7.5) = round(7.5) = 8
+      // DMG: 0xF - 8 = 7, GBA: 8
+      const sample = makeConstSample('SIL', 0, 32);
+
+      const { data: gbaData } = SampleBankCompiler.compile([sample], true);
+      const { data: dmgData } = SampleBankCompiler.compile([sample], false);
+
+      // GBA: nibble 8, packed pair = 0x88
+      // Due to wave rotation, position 0 gets the value from counter 31 (which is also 8)
+      // and position 1 gets counter 0's value. All constant, so all bytes should be 0x88.
+      for (let i = 0x60; i < 0x60 + 0x10; i++) {
+        expect(gbaData[i]).toBe(0x88);
+      }
+
+      // DMG: nibble 7, packed pair = 0x77
+      for (let i = 0x60; i < 0x60 + 0x10; i++) {
+        expect(dmgData[i]).toBe(0x77);
+      }
+    });
+
+    it('should quantize max positive (32767) to nibble 15 (GBA) or 0 (DMG)', () => {
+      // Value 32767: round(32767 / 4096 + 7.5) = round(8.0 + 7.5) = round(15.5) ≈ 16 → clamped to 15
+      // DMG: 0xF - 15 = 0
+      const sample = makeConstSample('MAX', 32767, 32);
+
+      const { data: gbaData } = SampleBankCompiler.compile([sample], true);
+      const { data: dmgData } = SampleBankCompiler.compile([sample], false);
+
+      for (let i = 0x60; i < 0x60 + 0x10; i++) {
+        expect(gbaData[i]).toBe(0xff);
+        expect(dmgData[i]).toBe(0x00);
+      }
+    });
+
+    it('should quantize max negative (-32768) to nibble 0 (GBA) or 15 (DMG)', () => {
+      // Value -32768: round(-32768 / 4096 + 7.5) = round(-8.0 + 7.5) = round(-0.5) = 0
+      // DMG: 0xF - 0 = 15
+      const sample = makeConstSample('MIN', -32768, 32);
+
+      const { data: gbaData } = SampleBankCompiler.compile([sample], true);
+      const { data: dmgData } = SampleBankCompiler.compile([sample], false);
+
+      for (let i = 0x60; i < 0x60 + 0x10; i++) {
+        expect(gbaData[i]).toBe(0x00);
+        expect(dmgData[i]).toBe(0xff);
+      }
+    });
+
+    it('should discard incomplete frames (< 32 samples)', () => {
+      // 48 samples: 32 complete + 16 incomplete → only 16 bytes output
+      const data = new Int16Array(48);
+      data.fill(0);
+      const sample = makeSample('INC', data);
+
+      const { byteLengths } = SampleBankCompiler.compile([sample], false);
+      expect(byteLengths[0]).toBe(0x10); // only 32-sample frame produces output
+    });
+
+    it('should apply wave frame rotation (position (counter+1) % 32)', () => {
+      // Create a sample where each of the 32 values is different
+      // to verify the rotation pattern
+      const data = new Int16Array(32);
+      for (let i = 0; i < 32; i++) {
+        // Use values that map to distinct nibbles 0-15
+        // nibble = round(value / 4096 + 7.5)
+        // For nibble n: value = (n - 7.5) * 4096
+        data[i] = Math.round((i % 16 - 7.5) * 4096);
+      }
+      const sample = makeSample('ROT', data);
+
+      const { data: compiled } = SampleBankCompiler.compile([sample], true);
+
+      // The rotation means: outputBuffer[(counter+1) % 32] = nibble
+      // So counter=0 goes to position 1, counter=1 goes to position 2, ..., counter=31 goes to position 0
+      // Position 0 should contain the nibble from counter=31
+      // Position 1 should contain the nibble from counter=0
+      // The packed bytes start at offset 0x60
+
+      // Verify position 0 has counter 31's nibble and position 1 has counter 0's nibble
+      const expectedNibbleAt0 = Math.min(15, Math.max(0, Math.round(data[31] / 4096 + 7.5)));
+      const expectedNibbleAt1 = Math.min(15, Math.max(0, Math.round(data[0] / 4096 + 7.5)));
+      const expectedByte = (expectedNibbleAt0 << 4) | expectedNibbleAt1;
+      expect(compiled[0x60]).toBe(expectedByte);
+    });
+  });
+
+  describe('compile + unswizzle round-trip', () => {
+    it('should reconstruct waveform within quantization tolerance', async () => {
+      // Create a recognizable waveform pattern
+      const data = new Int16Array(64);
+      for (let i = 0; i < 64; i++) {
+        // Sawtooth wave that spans the full range
+        data[i] = Math.round(-32768 + (i / 63) * 65535);
+      }
+      const sample = makeSample('SAW', data);
+
+      // Compile with DMG polarity (what writeToRomBank uses)
+      const rom = new ArrayBuffer(BANK_SIZE * 2);
+      SampleBankCompiler.writeToRomBank(rom, 1, [sample], 'KIT', false);
+
+      // Extract (which calls unswizzle internally for v1 banks)
+      const { samples } = await SampleBankCompiler.extractFromRomBank(rom, 1);
+      expect(samples[0]).not.toBeNull();
+
+      const extracted = samples[0]!;
+      expect(extracted.lengthInSamples()).toBe(64);
+
+      // The extracted data goes through 4-bit quantization, so values won't match exactly
+      // But the overall shape should be preserved (monotonically increasing sawtooth)
+      const extractedData = extracted.workSampleData();
+      for (let i = 1; i < extractedData.length; i++) {
+        // Each sample should be >= the previous (sawtooth wave, monotonically increasing)
+        // Allow equality since 4-bit quantization can collapse adjacent values
+        expect(extractedData[i]).toBeGreaterThanOrEqual(extractedData[i - 1]);
+      }
+    });
+  });
+
   describe('extractKitNameFromRomBank', () => {
     it('should return kit name from valid kit bank', () => {
       const rom = new ArrayBuffer(BANK_SIZE * 2);
